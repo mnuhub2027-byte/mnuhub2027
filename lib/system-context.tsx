@@ -295,9 +295,11 @@ export function SystemProvider({ children }: { children: ReactNode }) {
   }
 
   // Faculty: Delete club
-  const deleteClub = (clubId: string) => {
+  const deleteClub = async (clubId: string) => {
+    const { error } = await supabase.from('clubs').delete().eq('id', clubId)
+    if (error) { toast.error('فشل حذف التيم: ' + error.message); return }
     setClubs((prev) => prev.filter((c) => c.id !== clubId))
-    toast.info('Team deleted')
+    toast.success('تم حذف التيم بنجاح')
   }
 
   // Faculty: Add Admin Account
