@@ -59,7 +59,7 @@ type SystemContextType = {
 
   // Members (Member View & Leader View)
   members: Member[]
-  updateMemberRole: (memberId: string, role: 'Leader' | 'Vice Leader' | 'Member') => void
+  updateMemberRole: (memberId: string, role: 'Leader' | 'Vice Leader' | 'Member') => Promise<void>
 
   // Promotion Requests (Member -> Leader Approval)
   promotionRequests: PromotionRequest[]
@@ -447,11 +447,15 @@ export function SystemProvider({ children }: { children: ReactNode }) {
     if (role === 'Leader') dbRole = 'leader'
     if (role === 'Vice Leader') dbRole = 'assistant'
 
-    const { error } = await supabase.from('club_members').update({ role: dbRole }).eq('id', memberId)
-    if (error) { toast.error(error.message); return }
+    const { error } = await supabase
+      .from('club_members')
+      .update({ role: dbRole })
+      .or(`id.eq.${memberId},user_id.eq.${memberId}`)
+
+    if (error) { toast.error('فشل تحديث الرتبة: ' + error.message); return }
 
     setMembers((prev) => prev.map((m) => (m.id === memberId ? { ...m, role } : m)))
-    toast.success('Member role updated to ' + role)
+    toast.success(role === 'Member' ? 'تم تخفيض الرتبة إلى عضو بنجاح' : 'تم تحديث رتبة العضو بنجاح')
   }
 
   // Member: Request Promotion
@@ -575,7 +579,7 @@ export function SystemProvider({ children }: { children: ReactNode }) {
     }
 
     // 2. Upsert into club_members setting role = 'assistant', status = 'active'
-    const { error: upsertErr } = await supabase.from('club_members').upsert(
+    const { data: upsertData, error: upsertErr } = await supabase.from('club_members').upsert(
       {
         user_id: profile.id,
         club_id: targetClubId,
@@ -583,7 +587,7 @@ export function SystemProvider({ children }: { children: ReactNode }) {
         status: 'active',
       },
       { onConflict: 'club_id, user_id' }
-    )
+    ).select('id').single()
 
     if (upsertErr) {
       toast.error('حدث خطأ أثناء الترقية: ' + upsertErr.message)
@@ -593,16 +597,17 @@ export function SystemProvider({ children }: { children: ReactNode }) {
     toast.success(`تمت ترقية ${profile.full_name || cleanEmail} إلى أدمن / مساعد الفريق بنجاح! 👑`)
 
     // Update local state for members UI
+    const rowId = upsertData?.id || profile.id
     const name = profile.full_name || cleanEmail
     const initials = name.substring(0, 2).toUpperCase()
     setMembers((prev) => {
-      const exists = prev.find((m) => m.id === profile.id)
+      const exists = prev.find((m) => m.id === rowId || m.id === profile.id)
       if (exists) {
-        return prev.map((m) => (m.id === profile.id ? { ...m, role: 'Vice Leader' } : m))
+        return prev.map((m) => ((m.id === rowId || m.id === profile.id) ? { ...m, id: rowId, role: 'Vice Leader' } : m))
       } else {
         return [
           {
-            id: profile.id,
+            id: rowId,
             name,
             initials,
             department: 'General',

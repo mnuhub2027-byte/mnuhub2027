@@ -22,6 +22,7 @@ import {
   Megaphone,
   BookOpen,
   Trophy,
+  Loader2,
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
@@ -238,6 +239,16 @@ const roleRank: Record<TeamRole, number> = {
 
 function MemberManagement() {
   const { members, updateMemberRole } = useSystem()
+  const [loadingId, setLoadingId] = useState<string | null>(null)
+
+  const handleRoleChange = async (memberId: string, newRole: 'Vice Leader' | 'Member') => {
+    setLoadingId(memberId)
+    try {
+      await updateMemberRole(memberId, newRole)
+    } finally {
+      setLoadingId(null)
+    }
+  }
 
   return (
     <div>
@@ -269,21 +280,31 @@ function MemberManagement() {
                   <>
                     {roleRank[m.role] < 1 && (
                       <button
-                        onClick={() => updateMemberRole(m.id, 'Admin')}
-                        title="ترقية إلى أدمن"
-                        className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-chart-3 transition-colors hover:bg-secondary"
+                        onClick={() => handleRoleChange(m.id, 'Vice Leader')}
+                        disabled={loadingId === m.id}
+                        title="ترقية إلى أدمن (Vice Leader)"
+                        className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-chart-3 transition-colors hover:bg-secondary disabled:opacity-50"
                       >
-                        <ArrowUp className="size-3.5" />
-                        قبول الترقية لأدمن
+                        {loadingId === m.id ? (
+                          <Loader2 className="size-3.5 animate-spin" />
+                        ) : (
+                          <ArrowUp className="size-3.5" />
+                        )}
+                        ترقية لأدمن
                       </button>
                     )}
                     {roleRank[m.role] >= 1 && (
                       <button
-                        onClick={() => updateMemberRole(m.id, 'Member')}
+                        onClick={() => handleRoleChange(m.id, 'Member')}
+                        disabled={loadingId === m.id}
                         title="تنزيل إلى عضو"
-                        className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-chart-4 transition-colors hover:bg-secondary"
+                        className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-chart-4 transition-colors hover:bg-secondary disabled:opacity-50"
                       >
-                        <ArrowDown className="size-3.5" />
+                        {loadingId === m.id ? (
+                          <Loader2 className="size-3.5 animate-spin" />
+                        ) : (
+                          <ArrowDown className="size-3.5" />
+                        )}
                         تخفيض لعضو
                       </button>
                     )}
