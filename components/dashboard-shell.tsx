@@ -25,16 +25,16 @@ export function DashboardShell({
   const current = tabs.find((t) => t.id === active) ?? tabs[0]
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[240px_1fr]">
+    <div className="flex flex-col gap-4 lg:grid lg:gap-6 lg:grid-cols-[240px_1fr]">
       {/* Sidebar */}
       <aside className="lg:sticky lg:top-24 lg:h-fit">
         {sidebarHeader ? (
-          <div className="mb-4 rounded-2xl border border-border glass p-4">
+          <div className="mb-3 hidden rounded-2xl border border-border glass p-4 lg:block">
             {sidebarHeader}
           </div>
         ) : null}
         <nav
-          className="flex gap-2 overflow-x-auto rounded-2xl border border-border glass p-2 lg:flex-col lg:overflow-visible"
+          className="flex gap-1.5 overflow-x-auto rounded-2xl border border-border glass p-2 lg:flex-col lg:overflow-visible"
           aria-label="Dashboard sections"
         >
           {tabs.map((tab) => {
@@ -44,7 +44,7 @@ export function DashboardShell({
                 key={tab.id}
                 onClick={() => setActive(tab.id)}
                 className={cn(
-                  'relative flex shrink-0 items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-left text-sm font-medium transition-colors',
+                  'relative flex shrink-0 items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition-colors lg:px-3.5',
                   isActive
                     ? 'text-foreground'
                     : 'text-muted-foreground hover:text-foreground',
@@ -64,7 +64,7 @@ export function DashboardShell({
                     isActive ? accent : '',
                   )}
                 />
-                <span className="relative z-10 whitespace-nowrap">
+                <span className="relative z-10 whitespace-nowrap text-xs sm:text-sm">
                   {tab.label}
                 </span>
               </button>

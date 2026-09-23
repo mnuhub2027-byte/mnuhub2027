@@ -21,27 +21,27 @@ export function ClubDirectory({
   const filters: (Category | 'All')[] = ['All', ...categories]
 
   return (
-    <section id="directory" className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+    <section id="directory" className="mx-auto max-w-7xl px-4 py-14 sm:px-6 sm:py-20 lg:px-8">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h2 className="font-display text-3xl font-bold tracking-tight sm:text-4xl">
+          <h2 className="font-display text-2xl font-bold tracking-tight sm:text-4xl">
             Explore the club directory
           </h2>
-          <p className="mt-2 max-w-xl text-pretty text-muted-foreground">
+          <p className="mt-2 max-w-xl text-sm text-pretty text-muted-foreground sm:text-base">
             {clubs.length} {clubs.length === 1 ? 'club matches' : 'clubs match'}{' '}
             your search. Filter by category to narrow it down.
           </p>
         </div>
       </div>
 
-      <div className="mt-8 flex flex-wrap gap-2">
+      <div className="mt-6 flex flex-wrap gap-2">
         {filters.map((c) => {
           const active = category === c
           return (
             <button
               key={c}
               onClick={() => onCategory(c)}
-              className={`rounded-full border px-4 py-1.5 text-sm font-medium transition-colors ${
+              className={`rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors sm:px-4 sm:text-sm ${
                 active
                   ? 'border-primary bg-primary text-primary-foreground'
                   : 'border-border bg-secondary/40 text-muted-foreground hover:bg-secondary hover:text-foreground'
@@ -62,7 +62,7 @@ export function ClubDirectory({
           </p>
         </div>
       ) : (
-        <div className="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3">
           <AnimatePresence mode="popLayout">
             {clubs.map((club) => (
               <ClubCard key={club.id} club={club} onView={onView} />
