@@ -131,7 +131,17 @@ export function ClubDetailsModal({ club, onClose }: ModalProps) {
                   form={form}
                   set={set}
                   onSubmit={() => {
-                    applyToClub(club.id, club.name, form.role || club.openRoles[0], form.motivation)
+                    applyToClub(
+                      club.id,
+                      club.name,
+                      form.role || club.openRoles[0],
+                      form.motivation,
+                      form.portfolio,
+                      form.whatsapp,
+                      form.studentId,
+                      form.faculty,
+                      form.name
+                    )
                     setSubmitted(true)
                   }}
                   onBackToOverview={() => setApplying(false)}

@@ -49,7 +49,17 @@ type SystemContextType = {
 
   // Student Applications (Applicant View)
   studentApplications: StudentApplication[]
-  applyToClub: (clubId: string, clubName: string, role: string, note?: string) => void
+  applyToClub: (
+    clubId: string,
+    clubName: string,
+    role: string,
+    note?: string,
+    cvLink?: string,
+    whatsapp?: string,
+    studentId?: string,
+    faculty?: string,
+    fullName?: string
+  ) => Promise<void> | void
 
   // Pipeline Applicants (Assistant View)
   applicants: Applicant[]
@@ -169,6 +179,33 @@ export function SystemProvider({ children }: { children: ReactNode }) {
       }
 
       if (activeClubId) {
+        // Load Promotion Requests first so we can attach CV / motivation to applicants
+        const { data: dbProms } = await supabase.from('promotion_requests').select('*').eq('club_id', activeClubId)
+        const cvMap = new Map<string, { cv_link?: string; reason?: string; phone?: string; department?: string }>()
+        if (dbProms) {
+           setPromotionRequests(dbProms.map(p => ({
+              id: p.id,
+              memberName: p.member_name,
+              memberInitials: (p.member_name || 'طالب').substring(0, 2).toUpperCase(),
+              department: p.department || '',
+              requestedRole: 'Vice Leader',
+              submittedAt: new Date(p.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+              status: p.status,
+              reason: p.reason || ''
+           })))
+
+           dbProms.forEach((p: any) => {
+             if (p.user_id) {
+               cvMap.set(p.user_id, {
+                 cv_link: p.cv_link || '',
+                 reason: p.reason || '',
+                 phone: p.phone || '',
+                 department: p.department || '',
+               })
+             }
+           })
+        }
+
         // Load Members and Applicants for THIS club
         const { data: dbMembers } = await supabase
           .from('club_members')
@@ -185,17 +222,23 @@ export function SystemProvider({ children }: { children: ReactNode }) {
               const submittedAt = m.created_at
                 ? new Date(m.created_at).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' })
                 : 'غير محدد'
+              const userReq = m.user_id ? cvMap.get(m.user_id) : undefined
+              const cvLink = userReq?.cv_link || ''
+              const motivation = userReq?.reason || ''
+
               newApplicants.push({
                 id: m.id,
                 name: profileName,
-                faculty: m.profiles?.faculty || 'غير محدد',
+                faculty: m.profiles?.faculty || userReq?.department || 'غير محدد',
                 year: 'N/A',
-                role: m.role,
+                role: m.role || 'member',
                 stage: 'Reviewing',
                 score: 0,
-                portfolio: '',
+                portfolio: cvLink,
+                cvLink: cvLink,
+                motivation: motivation,
                 email: m.profiles?.email || '',
-                whatsapp: m.profiles?.whatsapp || '',
+                whatsapp: m.profiles?.whatsapp || userReq?.phone || '',
                 studentId: m.profiles?.student_id || '',
                 submittedAt,
               })
@@ -222,22 +265,6 @@ export function SystemProvider({ children }: { children: ReactNode }) {
           
           setMembers(newMembers)
           setApplicants(newApplicants)
-        }
-
-
-        // Load Promotion Requests
-        const { data: dbProms } = await supabase.from('promotion_requests').select('*').eq('club_id', activeClubId)
-        if (dbProms) {
-           setPromotionRequests(dbProms.map(p => ({
-              id: p.id,
-              memberName: p.member_name,
-              memberInitials: p.member_name.substring(0, 2).toUpperCase(),
-              department: p.department,
-              requestedRole: p.requested_role,
-              submittedAt: new Date(p.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-              status: p.status,
-              reason: p.reason
-           })))
         }
 
         // Load Announcements
@@ -370,21 +397,56 @@ export function SystemProvider({ children }: { children: ReactNode }) {
   }
 
   // Applicant: Apply to Club
-  const applyToClub = async (clubId: string, clubName: string, role: string, note?: string) => {
+  const applyToClub = async (
+    clubId: string,
+    clubName: string,
+    role: string,
+    note?: string,
+    cvLink?: string,
+    whatsapp?: string,
+    studentId?: string,
+    faculty?: string,
+    fullName?: string
+  ) => {
     const { data: { session } } = await supabase.auth.getSession()
-    if (!session?.user) { toast.error('You must be logged in to apply'); return }
+    if (!session?.user) { toast.error('يجب تسجيل الدخول أولاً للتقديم'); return }
 
-    const { error } = await supabase.from('club_members').insert({
+    // 1. Update user's profile with latest details
+    const profileUpdates: any = {}
+    if (whatsapp) profileUpdates.whatsapp = whatsapp
+    if (studentId) profileUpdates.student_id = studentId
+    if (faculty) profileUpdates.faculty = faculty
+    if (fullName) profileUpdates.full_name = fullName
+    if (Object.keys(profileUpdates).length > 0) {
+      await supabase.from('profiles').update(profileUpdates).eq('id', session.user.id)
+    }
+
+    // 2. Insert or upsert into club_members
+    const { data: memberRow, error } = await supabase.from('club_members').upsert({
       club_id: clubId,
       user_id: session.user.id,
       role: 'member',
       status: 'pending'
-    })
+    }, { onConflict: 'club_id,user_id' }).select().single()
 
-    if (error) { toast.error('Failed to apply: ' + error.message); return }
+    if (error) { toast.error('فشل تقديم الطلب: ' + error.message); return }
 
-    const dateStr = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-    const appId = 'app-' + Date.now()
+    // 3. Save CV link and reason into promotion_requests
+    if (cvLink || note) {
+      await supabase.from('promotion_requests').insert({
+        club_id: clubId,
+        user_id: session.user.id,
+        member_name: fullName || session.user.user_metadata?.full_name || 'طالب',
+        department: faculty || 'غير محدد',
+        phone: whatsapp || '',
+        cv_link: cvLink || '',
+        reason: note || 'طلب انضمام للفريق',
+        status: 'Pending'
+      })
+    }
+
+    const dateStr = new Date().toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' })
+    const appId = memberRow?.id || ('app-' + Date.now())
     
     setStudentApplications((prev) => [{
       id: appId,
@@ -393,10 +455,30 @@ export function SystemProvider({ children }: { children: ReactNode }) {
       role,
       submitted: dateStr,
       status: 'Pending',
-      note: note || 'Application submitted and under review.',
+      note: note || 'تم إرسال الطلب وهو قيد المراجعة.',
     }, ...prev])
 
-    toast.success('Applied to ' + clubName + ' for ' + role + '!')
+    // Also update applicants state if currently viewing this club
+    if (currentClubId === clubId) {
+      setApplicants((prev) => [{
+        id: appId,
+        name: fullName || 'طالب جديد',
+        faculty: faculty || 'غير محدد',
+        year: 'N/A',
+        role: role || 'عضو',
+        stage: 'Reviewing',
+        score: 0,
+        portfolio: cvLink || '',
+        cvLink: cvLink || '',
+        motivation: note || '',
+        email: session.user.email || '',
+        whatsapp: whatsapp || '',
+        studentId: studentId || '',
+        submittedAt: dateStr,
+      }, ...prev])
+    }
+
+    toast.success('تم إرسال طلب الانضمام إلى ' + clubName + ' بنجاح!')
   }
 
   // Assistant: Advance stage

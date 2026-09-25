@@ -245,6 +245,8 @@ export type Applicant = {
   stage: 'Reviewing' | 'Interview' | 'Accepted'
   score: number
   portfolio: string
+  cvLink?: string
+  motivation?: string
   email?: string
   whatsapp?: string
   studentId?: string

@@ -16,6 +16,8 @@ import {
   Trash2,
   Loader2,
   Megaphone,
+  FileText,
+  ExternalLink,
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
@@ -122,6 +124,31 @@ function Pipeline() {
                           <div className="flex items-center gap-2">
                             <span className="w-16 shrink-0 text-muted-foreground">تاريخ التقديم</span>
                             <span className="font-medium text-foreground">{a.submittedAt}</span>
+                          </div>
+                        )}
+                        {/* CV / Portfolio Link */}
+                        <div className="flex items-center gap-2 pt-1 border-t border-border/30">
+                          <span className="w-16 shrink-0 text-muted-foreground">الـ CV</span>
+                          {a.cvLink || a.portfolio ? (
+                            <a
+                              href={a.cvLink || a.portfolio}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 rounded-lg bg-primary/10 border border-primary/20 px-2 py-1 text-xs font-semibold text-primary transition-colors hover:bg-primary/20"
+                            >
+                              <FileText className="size-3.5" />
+                              عرض ملف الـ CV
+                              <ExternalLink className="size-3" />
+                            </a>
+                          ) : (
+                            <span className="text-muted-foreground/60 italic">لم يتم إرفاق رابط CV</span>
+                          )}
+                        </div>
+                        {/* Motivation / Reason */}
+                        {a.motivation && (
+                          <div className="flex items-start gap-2 pt-1">
+                            <span className="w-16 shrink-0 text-muted-foreground">الدافع</span>
+                            <span className="font-medium text-foreground/90 leading-tight">{a.motivation}</span>
                           </div>
                         )}
                       </div>
