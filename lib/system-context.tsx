@@ -172,7 +172,7 @@ export function SystemProvider({ children }: { children: ReactNode }) {
         // Load Members and Applicants for THIS club
         const { data: dbMembers } = await supabase
           .from('club_members')
-          .select('id, role, status, created_at, user_id, profiles(full_name, faculty, email, phone)')
+          .select('id, role, status, created_at, user_id, profiles(full_name, faculty, email, whatsapp, student_id)')
           .eq('club_id', activeClubId)
         
         if (dbMembers) {
@@ -208,7 +208,7 @@ export function SystemProvider({ children }: { children: ReactNode }) {
                 attendance: 100,
                 tasksDone: 0,
                 email: m.profiles?.email || '',
-                phone: m.profiles?.phone || '',
+                phone: m.profiles?.whatsapp || m.profiles?.student_id || '',
               })
             }
           })

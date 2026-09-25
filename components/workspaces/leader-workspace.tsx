@@ -310,10 +310,10 @@ function MemberManagement() {
                   </div>
                 )}
 
-                {/* Phone */}
+                {/* WhatsApp / Student ID */}
                 {m.phone && (
                   <div className="flex items-center gap-2 rounded-lg bg-background/60 px-3 py-2">
-                    <span className="text-muted-foreground w-20 shrink-0">الهاتف</span>
+                    <span className="text-muted-foreground w-20 shrink-0">واتساب / ID</span>
                     <span className="font-medium text-foreground font-sans">{m.phone}</span>
                   </div>
                 )}
