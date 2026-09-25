@@ -31,6 +31,7 @@ import {
   type TeamRole,
 } from '@/lib/data'
 import { useSystem } from '@/lib/system-context'
+import { toast } from 'sonner'
 import { StatusBadge } from '@/components/status-badge'
 import {
   DashboardShell,
@@ -430,35 +431,65 @@ function EventsManager() {
     if (!title || !date || !time) return
     setSaving(true)
 
-    // Direct Supabase insert since addInterview is for interviews
-    // We'll use addAnnouncement pattern - but for events table
     try {
       const { createClient } = await import('@/lib/supabase/client')
       const supabase = createClient()
-      const { data: membership } = await supabase
-        .from('club_members')
-        .select('club_id')
-        .eq('status', 'active')
-        .limit(1)
-        .maybeSingle()
+      const { data: sessionData } = await supabase.auth.getSession()
+      const user = sessionData?.session?.user
 
-      if (membership) {
-        await supabase.from('team_events').insert({
-          club_id: membership.club_id,
-          title,
-          type,
-          date,
-          time,
-          location: location || 'يحدد لاحقاً',
-        })
+      let clubId: string | null = null
+
+      if (user) {
+        const { data: membership } = await supabase
+          .from('club_members')
+          .select('club_id')
+          .eq('user_id', user.id)
+          .eq('status', 'active')
+          .limit(1)
+          .maybeSingle()
+
+        if (membership?.club_id) {
+          clubId = membership.club_id
+        } else {
+          const { data: adminRecord } = await supabase
+            .from('platform_admins')
+            .select('assigned_team_id')
+            .eq('email', user.email)
+            .limit(1)
+            .maybeSingle()
+
+          if (adminRecord?.assigned_team_id) {
+            clubId = adminRecord.assigned_team_id
+          }
+        }
       }
+
+      if (!clubId) {
+        toast.error('لم يتم العثور على التيم الخاص بك.')
+        return
+      }
+
+      const { error: insertErr } = await supabase.from('team_events').insert({
+        club_id: clubId,
+        title,
+        type,
+        date,
+        time,
+        location: location || 'يحدد لاحقاً',
+      })
+
+      if (insertErr) {
+        toast.error('حدث خطأ أثناء حفظ الحدث: ' + insertErr.message)
+        return
+      }
+
+      toast.success('تم نشر الحدث بنجاح ويظهر الآن في المنصة والأخبار! 🎯')
+      setTitle(''); setType('workshop'); setDate(''); setTime(''); setLocation('')
+      setShowModal(false)
+      window.location.reload()
     } finally {
       setSaving(false)
     }
-
-    setTitle(''); setType('workshop'); setDate(''); setTime(''); setLocation('')
-    setShowModal(false)
-    window.location.reload()
   }
 
   return (

@@ -15,6 +15,8 @@ import {
   CheckCircle2,
   Sparkles,
   X,
+  Calendar as CalendarIcon,
+  Megaphone,
 } from 'lucide-react'
 import { useSystem } from '@/lib/system-context'
 import { useRole } from '@/components/role-context'
@@ -77,30 +79,76 @@ function useMemberProfile(): MemberProfile | null {
 }
 
 function Announcements() {
-  const { announcements } = useSystem()
+  const { announcements, teamEvents } = useSystem()
 
   return (
-    <div>
+    <div className="space-y-6">
       <SectionTitle
-        title="الإعلانات الداخلية بالفريق"
-        subtitle="آخر التحديثات والتوجيهات من قائد الفريق والمساعدين."
+        title="الإعلانات والأنشطة بالفريق"
+        subtitle="آخر التحديثات، الفعاليات، والتوجيهات الصادرة من قائد الفريق والمساعدين."
       />
+
+      {/* Team Events Banner */}
+      {teamEvents.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 text-sm font-semibold text-primary">
+            <CalendarIcon className="size-4" />
+            <span>الفعاليات والأحداث القادمة للتيم ({teamEvents.length})</span>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {teamEvents.map((ev) => (
+              <Panel key={ev.id} className="border-primary/20 bg-primary/5">
+                <div className="flex items-start justify-between gap-2">
+                  <p className="font-semibold text-foreground">{ev.title}</p>
+                  <StatusBadge status={ev.type} />
+                </div>
+                <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                  <span className="flex items-center gap-1 font-sans">
+                    <CalendarIcon className="size-3 text-primary" />
+                    {ev.date}
+                  </span>
+                  <span className="flex items-center gap-1 font-sans">
+                    <Clock className="size-3 text-accent" />
+                    {ev.time}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <MapPin className="size-3 text-chart-4" />
+                    {ev.location}
+                  </span>
+                </div>
+              </Panel>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Announcements List */}
       <div className="space-y-3">
-        {announcements.map((a) => (
-          <Panel key={a.id}>
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex items-center gap-2">
-                {a.pinned && <Pin className="size-4 text-primary" />}
-                <p className="font-medium text-foreground">{a.title}</p>
-              </div>
-              <span className="shrink-0 text-xs text-muted-foreground font-sans">
-                {a.date}
-              </span>
-            </div>
-            <p className="mt-2 text-sm text-foreground/80">{a.body}</p>
-            <p className="mt-3 text-xs text-muted-foreground">— {a.author}</p>
+        <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+          <Megaphone className="size-4" />
+          <span>الإعلانات والتوجيهات</span>
+        </div>
+        {announcements.length === 0 && teamEvents.length === 0 ? (
+          <Panel className="py-8 text-center text-sm text-muted-foreground">
+            لا توجد إعلانات أو فعاليات منشورة بالفريق حالياً.
           </Panel>
-        ))}
+        ) : (
+          announcements.map((a) => (
+            <Panel key={a.id}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  {a.pinned && <Pin className="size-4 text-primary" />}
+                  <p className="font-medium text-foreground">{a.title}</p>
+                </div>
+                <span className="shrink-0 text-xs text-muted-foreground font-sans">
+                  {a.date}
+                </span>
+              </div>
+              <p className="mt-2 text-sm text-foreground/80">{a.body}</p>
+              <p className="mt-3 text-xs text-muted-foreground">— {a.author}</p>
+            </Panel>
+          ))
+        )}
       </div>
     </div>
   )
@@ -113,37 +161,50 @@ function Calendar() {
     <div>
       <SectionTitle
         title="جدول الأنشطة واللقاءات"
-        subtitle="المواعيد ورش العمل والمقابلات القادمة بالفريق."
+        subtitle="مواعيد ورش العمل، المسابقات، واللقاءات القادمة بالفريق."
       />
       <div className="space-y-3">
-        {teamEvents.map((e) => (
-          <Panel key={e.id} className="flex items-center gap-4">
-            <div className="flex size-14 shrink-0 flex-col items-center justify-center rounded-xl border border-border bg-secondary/50">
-              <span className="text-xs font-medium text-muted-foreground font-sans">
-                {e.day}
-              </span>
-              <span className="font-display text-sm font-bold font-sans">
-                {e.date.split(' ')[1]}
-              </span>
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <p className="font-medium">{e.title}</p>
-                <StatusBadge status={e.type} />
-              </div>
-              <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                <span className="flex items-center gap-1 font-sans">
-                  <Clock className="size-3" />
-                  {e.time}
-                </span>
-                <span className="flex items-center gap-1">
-                  <MapPin className="size-3" />
-                  {e.location}
-                </span>
-              </div>
-            </div>
+        {teamEvents.length === 0 ? (
+          <Panel className="py-8 text-center text-sm text-muted-foreground">
+            لا توجد فعاليات مسجلة للفريق حالياً.
           </Panel>
-        ))}
+        ) : (
+          teamEvents.map((e) => {
+            const dateObj = new Date(e.date)
+            const isValid = !isNaN(dateObj.getTime())
+            const monthStr = isValid ? dateObj.toLocaleDateString('en-US', { month: 'short' }) : (e.day || '')
+            const dayNum = isValid ? dateObj.getDate() : e.date
+
+            return (
+              <Panel key={e.id} className="flex items-center gap-4">
+                <div className="flex size-14 shrink-0 flex-col items-center justify-center rounded-xl border border-border bg-secondary/50">
+                  <span className="text-xs font-medium text-muted-foreground font-sans">
+                    {monthStr}
+                  </span>
+                  <span className="font-display text-sm font-bold font-sans">
+                    {dayNum}
+                  </span>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-medium">{e.title}</p>
+                    <StatusBadge status={e.type} />
+                  </div>
+                  <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1 font-sans">
+                      <Clock className="size-3" />
+                      {e.time}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <MapPin className="size-3" />
+                      {e.location}
+                    </span>
+                  </div>
+                </div>
+              </Panel>
+            )
+          })
+        )}
       </div>
     </div>
   )

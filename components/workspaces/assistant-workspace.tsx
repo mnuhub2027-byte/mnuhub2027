@@ -11,6 +11,9 @@ import {
   Check,
   UserCheck,
   X,
+  Calendar,
+  Clock,
+  MapPin,
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
@@ -335,7 +338,7 @@ function Attendance() {
 }
 
 function AnnouncementsManager() {
-  const { announcements, addAnnouncement } = useSystem()
+  const { announcements, addAnnouncement, teamEvents } = useSystem()
   const [showModal, setShowModal] = useState(false)
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
@@ -350,10 +353,10 @@ function AnnouncementsManager() {
   }
 
   return (
-    <div>
+    <div className="space-y-6">
       <SectionTitle
         title="الإعلانات والأحداث"
-        subtitle="نشر إعلانات وأحداث جديدة لأعضاء الفريق والمنصة."
+        subtitle="متابعة ونشر أحداث وفعاليات وإعلانات الفريق."
         action={
           <button
             onClick={() => setShowModal(true)}
@@ -364,10 +367,49 @@ function AnnouncementsManager() {
           </button>
         }
       />
+
+      {/* Events Section */}
+      {teamEvents.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 text-sm font-semibold text-chart-4">
+            <Calendar className="size-4" />
+            <span>الفعاليات والأحداث المسجلة للفريق ({teamEvents.length})</span>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {teamEvents.map((ev) => (
+              <Panel key={ev.id} className="border-chart-4/30 bg-chart-4/5">
+                <div className="flex items-start justify-between gap-2">
+                  <p className="font-semibold text-foreground">{ev.title}</p>
+                  <StatusBadge status={ev.type} />
+                </div>
+                <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                  <span className="flex items-center gap-1 font-sans">
+                    <Calendar className="size-3 text-chart-4" />
+                    {ev.date}
+                  </span>
+                  <span className="flex items-center gap-1 font-sans">
+                    <Clock className="size-3 text-accent" />
+                    {ev.time}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <MapPin className="size-3 text-primary" />
+                    {ev.location}
+                  </span>
+                </div>
+              </Panel>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Announcements Section */}
       <div className="space-y-3">
-        {announcements.length === 0 ? (
+        <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+          <span>الإعلانات والتوجيهات الداخلية</span>
+        </div>
+        {announcements.length === 0 && teamEvents.length === 0 ? (
           <p className="py-8 text-center text-sm text-muted-foreground">
-            لا توجد إعلانات منشورة من الفريق بعد. اضغط على "نشر إعلان جديد".
+            لا توجد إعلانات أو فعاليات منشورة من الفريق بعد.
           </p>
         ) : (
           announcements.map((a: Announcement) => (
