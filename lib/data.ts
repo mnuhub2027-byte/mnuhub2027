@@ -317,6 +317,9 @@ export type Member = {
   joined: string
   attendance: number
   tasksDone: number
+  email?: string
+  phone?: string
+  userId?: string
 }
 
 export const activeTeam = {

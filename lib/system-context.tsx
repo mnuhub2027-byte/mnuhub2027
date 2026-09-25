@@ -170,7 +170,10 @@ export function SystemProvider({ children }: { children: ReactNode }) {
 
       if (activeClubId) {
         // Load Members and Applicants for THIS club
-        const { data: dbMembers } = await supabase.from('club_members').select('id, role, status, profiles(full_name, faculty)').eq('club_id', activeClubId)
+        const { data: dbMembers } = await supabase
+          .from('club_members')
+          .select('id, role, status, created_at, user_id, profiles(full_name, faculty, email, phone)')
+          .eq('club_id', activeClubId)
         
         if (dbMembers) {
           const newMembers: Member[] = []
@@ -191,15 +194,21 @@ export function SystemProvider({ children }: { children: ReactNode }) {
               })
             } else if (m.status === 'active') {
               const initials = profileName.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)
+              const joinedDate = m.created_at
+                ? new Date(m.created_at).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' })
+                : 'غير محدد'
               newMembers.push({
                 id: m.id,
+                userId: m.user_id,
                 name: profileName,
                 initials: initials,
-                department: 'General',
+                department: m.profiles?.faculty || 'غير محدد',
                 role: m.role === 'assistant' ? 'Vice Leader' : (m.role === 'leader' ? 'Leader' : 'Member'),
-                joined: 'Recently',
+                joined: joinedDate,
                 attendance: 100,
                 tasksDone: 0,
+                email: m.profiles?.email || '',
+                phone: m.profiles?.phone || '',
               })
             }
           })
@@ -207,6 +216,7 @@ export function SystemProvider({ children }: { children: ReactNode }) {
           setMembers(newMembers)
           setApplicants(newApplicants)
         }
+
 
         // Load Promotion Requests
         const { data: dbProms } = await supabase.from('promotion_requests').select('*').eq('club_id', activeClubId)

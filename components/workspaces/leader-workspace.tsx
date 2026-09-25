@@ -251,71 +251,117 @@ function MemberManagement() {
     }
   }
 
+  const roleIcon = (role: string) => {
+    if (role === 'Leader') return <Crown className="size-4 text-yellow-500" />
+    if (role === 'Vice Leader') return <ShieldCheck className="size-4 text-chart-3" />
+    return <Award className="size-4 text-muted-foreground" />
+  }
+
+  const roleColor = (role: string) => {
+    if (role === 'Leader') return 'border-yellow-500/30 bg-yellow-500/5'
+    if (role === 'Vice Leader') return 'border-chart-3/30 bg-chart-3/5'
+    return 'border-border bg-secondary/20'
+  }
+
   return (
-    <div>
+    <div className="space-y-6">
       <SectionTitle
         title="إدارة هيكل الفريق والأعضاء"
-        subtitle="ترقية أو تغيير أدوار أعضاء الفريق مباشرة."
+        subtitle={`عدد الأعضاء الحالي: ${members.length} عضو — يمكنك ترقية أو تخفيض رتب الأعضاء مباشرة.`}
       />
-      <Panel className="p-0">
-        <div className="divide-y divide-border/60">
+
+      {members.length === 0 ? (
+        <Panel>
+          <p className="py-10 text-center text-sm text-muted-foreground">لا يوجد أعضاء مسجلون في الفريق حتى الآن.</p>
+        </Panel>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {members.map((m) => (
-            <div
-              key={m.id}
-              className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"
-            >
-              <div className="flex items-center gap-3">
-                <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/15 font-display text-sm font-bold text-primary">
+            <Panel key={m.id} className={`flex flex-col gap-4 border ${roleColor(m.role)}`}>
+              {/* Header: Avatar + Name + Role badge */}
+              <div className="flex items-start gap-3">
+                <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-primary/15 font-display text-base font-bold text-primary">
                   {m.initials}
                 </span>
-                <div>
-                  <p className="font-medium text-foreground">{m.name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    قسم {m.department} · انضم {m.joined}
-                  </p>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {roleIcon(m.role)}
+                    <p className="font-semibold text-foreground leading-tight">{m.name}</p>
+                  </div>
+                  <div className="mt-1">
+                    <StatusBadge status={m.role} />
+                  </div>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <StatusBadge status={m.role} />
-                {m.role !== 'Leader' && (
-                  <>
-                    {roleRank[m.role] < 1 && (
-                      <button
-                        onClick={() => handleRoleChange(m.id, 'Vice Leader')}
-                        disabled={loadingId === m.id}
-                        title="ترقية إلى أدمن (Vice Leader)"
-                        className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-chart-3 transition-colors hover:bg-secondary disabled:opacity-50"
-                      >
-                        {loadingId === m.id ? (
-                          <Loader2 className="size-3.5 animate-spin" />
-                        ) : (
-                          <ArrowUp className="size-3.5" />
-                        )}
-                        ترقية لأدمن
-                      </button>
-                    )}
-                    {roleRank[m.role] >= 1 && (
-                      <button
-                        onClick={() => handleRoleChange(m.id, 'Member')}
-                        disabled={loadingId === m.id}
-                        title="تنزيل إلى عضو"
-                        className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-chart-4 transition-colors hover:bg-secondary disabled:opacity-50"
-                      >
-                        {loadingId === m.id ? (
-                          <Loader2 className="size-3.5 animate-spin" />
-                        ) : (
-                          <ArrowDown className="size-3.5" />
-                        )}
-                        تخفيض لعضو
-                      </button>
-                    )}
-                  </>
+
+              {/* Details grid */}
+              <div className="grid grid-cols-1 gap-2 text-xs">
+                {/* Faculty / Department */}
+                <div className="flex items-center gap-2 rounded-lg bg-background/60 px-3 py-2">
+                  <span className="text-muted-foreground w-20 shrink-0">الكلية</span>
+                  <span className="font-medium text-foreground truncate">{m.department || 'غير محدد'}</span>
+                </div>
+
+                {/* Email */}
+                {m.email && (
+                  <div className="flex items-center gap-2 rounded-lg bg-background/60 px-3 py-2">
+                    <span className="text-muted-foreground w-20 shrink-0">الإيميل</span>
+                    <span className="font-medium text-foreground truncate font-sans">{m.email}</span>
+                  </div>
                 )}
+
+                {/* Phone */}
+                {m.phone && (
+                  <div className="flex items-center gap-2 rounded-lg bg-background/60 px-3 py-2">
+                    <span className="text-muted-foreground w-20 shrink-0">الهاتف</span>
+                    <span className="font-medium text-foreground font-sans">{m.phone}</span>
+                  </div>
+                )}
+
+                {/* Joined date */}
+                <div className="flex items-center gap-2 rounded-lg bg-background/60 px-3 py-2">
+                  <span className="text-muted-foreground w-20 shrink-0">تاريخ الانضمام</span>
+                  <span className="font-medium text-foreground">{m.joined}</span>
+                </div>
               </div>
-            </div>
+
+              {/* Actions */}
+              {m.role !== 'Leader' && (
+                <div className="flex gap-2 border-t border-border/40 pt-3">
+                  {roleRank[m.role] < 1 && (
+                    <button
+                      onClick={() => handleRoleChange(m.id, 'Vice Leader')}
+                      disabled={loadingId === m.id}
+                      className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl border border-border px-3 py-2 text-xs font-medium text-chart-3 transition-colors hover:bg-secondary disabled:opacity-50"
+                    >
+                      {loadingId === m.id ? (
+                        <Loader2 className="size-3.5 animate-spin" />
+                      ) : (
+                        <ArrowUp className="size-3.5" />
+                      )}
+                      ترقية لأدمن
+                    </button>
+                  )}
+                  {roleRank[m.role] >= 1 && (
+                    <button
+                      onClick={() => handleRoleChange(m.id, 'Member')}
+                      disabled={loadingId === m.id}
+                      className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl border border-border px-3 py-2 text-xs font-medium text-destructive/70 transition-colors hover:bg-secondary disabled:opacity-50"
+                    >
+                      {loadingId === m.id ? (
+                        <Loader2 className="size-3.5 animate-spin" />
+                      ) : (
+                        <ArrowDown className="size-3.5" />
+                      )}
+                      تخفيض لعضو
+                    </button>
+                  )}
+                </div>
+              )}
+            </Panel>
           ))}
         </div>
-      </Panel>
+      )}
     </div>
   )
 }
