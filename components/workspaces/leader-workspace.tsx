@@ -417,7 +417,7 @@ const EVENT_TYPES = [
 ]
 
 function EventsManager() {
-  const { teamEvents } = useSystem()
+  const { teamEvents, deleteTeamEvent } = useSystem()
   const [showModal, setShowModal] = useState(false)
   const [title, setTitle] = useState('')
   const [type, setType] = useState('workshop')
@@ -425,6 +425,17 @@ function EventsManager() {
   const [time, setTime] = useState('')
   const [location, setLocation] = useState('')
   const [saving, setSaving] = useState(false)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+
+  const handleDelete = async (id: string, eventTitle: string) => {
+    if (!window.confirm(`هل أنت متأكد من حذف حدث "${eventTitle}"؟\nسيتم حذفه من الموقع بالكامل فوراً.`)) return
+    setDeletingId(id)
+    try {
+      await deleteTeamEvent(id)
+    } finally {
+      setDeletingId(null)
+    }
+  }
 
   const handlePost = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -518,16 +529,33 @@ function EventsManager() {
           const typeInfo = EVENT_TYPES.find(t => t.value === ev.type) ?? EVENT_TYPES[0]
           const Icon = typeInfo.icon
           return (
-            <Panel key={ev.id}>
-              <div className="flex items-start gap-3">
-                <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10">
-                  <Icon className="size-5 text-primary" />
+            <Panel key={ev.id} className="relative group">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start gap-3 min-w-0 flex-1">
+                  <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10">
+                    <Icon className="size-5 text-primary" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-foreground truncate">{ev.title}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{typeInfo.label}</p>
+                  </div>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-foreground truncate">{ev.title}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{typeInfo.label}</p>
-                </div>
+
+                <button
+                  type="button"
+                  onClick={() => handleDelete(ev.id, ev.title)}
+                  disabled={deletingId === ev.id}
+                  title="حذف هذا الحدث من الموقع بالكامل"
+                  className="inline-flex size-8 shrink-0 items-center justify-center rounded-xl border border-destructive/20 bg-destructive/10 text-destructive transition-all hover:bg-destructive/20 disabled:opacity-50"
+                >
+                  {deletingId === ev.id ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="size-4" />
+                  )}
+                </button>
               </div>
+
               <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-muted-foreground">
                 <span>📅 {ev.date}</span>
                 <span>🕐 {ev.time}</span>

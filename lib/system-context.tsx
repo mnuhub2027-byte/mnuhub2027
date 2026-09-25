@@ -74,6 +74,7 @@ type SystemContextType = {
   myTasks: Task[]
   toggleTaskStatus: (taskId: string) => void
   teamEvents: TeamEvent[]
+  deleteTeamEvent: (eventId: string) => Promise<void>
   interviews: Interview[]
   addInterview: (interview: Omit<Interview, 'id'>) => void
 }
@@ -675,6 +676,17 @@ export function SystemProvider({ children }: { children: ReactNode }) {
     toast.success('Interview scheduled for ' + interviewData.applicant)
   }
 
+  // Delete Team Event
+  const deleteTeamEvent = async (eventId: string) => {
+    const { error } = await supabase.from('team_events').delete().eq('id', eventId)
+    if (error) {
+      toast.error('فشل حذف الحدث: ' + error.message)
+      return
+    }
+    setTeamEvents((prev) => prev.filter((e) => e.id !== eventId))
+    toast.success('تم حذف الحدث بنجاح من الموقع!')
+  }
+
   return (
     <SystemContext.Provider
       value={{
@@ -702,6 +714,7 @@ export function SystemProvider({ children }: { children: ReactNode }) {
         myTasks,
         toggleTaskStatus,
         teamEvents,
+        deleteTeamEvent,
         interviews,
         addInterview,
       }}
