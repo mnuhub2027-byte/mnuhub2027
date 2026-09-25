@@ -182,15 +182,22 @@ export function SystemProvider({ children }: { children: ReactNode }) {
           dbMembers.forEach((m: any) => {
             const profileName = m.profiles?.full_name || 'طالب'
             if (m.status === 'pending') {
+              const submittedAt = m.created_at
+                ? new Date(m.created_at).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' })
+                : 'غير محدد'
               newApplicants.push({
                 id: m.id,
                 name: profileName,
-                faculty: m.profiles?.faculty || 'N/A',
+                faculty: m.profiles?.faculty || 'غير محدد',
                 year: 'N/A',
                 role: m.role,
                 stage: 'Reviewing',
                 score: 0,
                 portfolio: '',
+                email: m.profiles?.email || '',
+                whatsapp: m.profiles?.whatsapp || '',
+                studentId: m.profiles?.student_id || '',
+                submittedAt,
               })
             } else if (m.status === 'active') {
               const initials = profileName.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)

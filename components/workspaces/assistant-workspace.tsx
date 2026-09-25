@@ -5,7 +5,6 @@ import {
   KanbanSquare,
   CalendarClock,
   ClipboardCheck,
-  Star,
   ChevronRight,
   Plus,
   Check,
@@ -16,6 +15,7 @@ import {
   MapPin,
   Trash2,
   Loader2,
+  Megaphone,
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
@@ -74,17 +74,59 @@ function Pipeline() {
                       exit={{ opacity: 0, scale: 0.95 }}
                       className="rounded-xl border border-border glass p-3 space-y-2"
                     >
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm font-semibold text-foreground">{a.name}</p>
-                        <span className="flex items-center gap-1 text-xs text-accent font-medium">
-                          <Star className="size-3 fill-accent" />
-                          {a.score}
-                        </span>
+                      {/* Header: Name */}
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-bold text-primary">
+                            {a.name.substring(0, 2)}
+                          </span>
+                          <p className="text-sm font-semibold text-foreground">{a.name}</p>
+                        </div>
                       </div>
-                      <p className="text-xs text-muted-foreground">
-                        {a.role} · كلية {a.faculty}
-                      </p>
 
+                      {/* Details */}
+                      <div className="space-y-1 rounded-lg bg-secondary/30 p-2 text-[11px]">
+                        {/* Faculty */}
+                        <div className="flex items-center gap-2">
+                          <span className="w-16 shrink-0 text-muted-foreground">الكلية</span>
+                          <span className="font-medium text-foreground">{a.faculty || 'غير محدد'}</span>
+                        </div>
+                        {/* Role applied for */}
+                        <div className="flex items-center gap-2">
+                          <span className="w-16 shrink-0 text-muted-foreground">التخصص</span>
+                          <span className="font-medium text-foreground">{a.role || 'عضو'}</span>
+                        </div>
+                        {/* Email */}
+                        {a.email && (
+                          <div className="flex items-center gap-2">
+                            <span className="w-16 shrink-0 text-muted-foreground">الإيميل</span>
+                            <span className="font-medium text-foreground font-sans truncate">{a.email}</span>
+                          </div>
+                        )}
+                        {/* WhatsApp */}
+                        {a.whatsapp && (
+                          <div className="flex items-center gap-2">
+                            <span className="w-16 shrink-0 text-muted-foreground">واتساب</span>
+                            <span className="font-medium text-foreground font-sans">{a.whatsapp}</span>
+                          </div>
+                        )}
+                        {/* Student ID */}
+                        {a.studentId && (
+                          <div className="flex items-center gap-2">
+                            <span className="w-16 shrink-0 text-muted-foreground">رقم الطالب</span>
+                            <span className="font-medium text-foreground font-sans">{a.studentId}</span>
+                          </div>
+                        )}
+                        {/* Submitted at */}
+                        {a.submittedAt && (
+                          <div className="flex items-center gap-2">
+                            <span className="w-16 shrink-0 text-muted-foreground">تاريخ التقديم</span>
+                            <span className="font-medium text-foreground">{a.submittedAt}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Notes */}
                       {openNote === a.id ? (
                         <textarea
                           autoFocus
@@ -94,7 +136,7 @@ function Pipeline() {
                           }
                           onBlur={() => setOpenNote(null)}
                           placeholder="ملاحظات المساعد التقييمية…"
-                          className="mt-2 w-full resize-none rounded-lg border border-input bg-background/60 p-2 text-xs outline-none focus:border-primary"
+                          className="w-full resize-none rounded-lg border border-input bg-background/60 p-2 text-xs outline-none focus:border-primary"
                           rows={2}
                         />
                       ) : notes[a.id] ? (
@@ -103,6 +145,7 @@ function Pipeline() {
                         </p>
                       ) : null}
 
+                      {/* Actions */}
                       <div className="flex flex-wrap items-center justify-between gap-1 pt-1 border-t border-border/40">
                         <button
                           onClick={() => setOpenNote(a.id)}
@@ -536,7 +579,7 @@ export function AssistantWorkspace() {
     { id: 'pipeline', label: 'Recruitment Pipeline', icon: KanbanSquare, render: () => <Pipeline /> },
     { id: 'interviews', label: 'Interviews', icon: CalendarClock, render: () => <Interviews /> },
     { id: 'attendance', label: 'Attendance', icon: ClipboardCheck, render: () => <Attendance /> },
-    { id: 'announcements', label: 'Announcements', icon: Star, render: () => <AnnouncementsManager /> },
+    { id: 'announcements', label: 'Announcements', icon: Megaphone, render: () => <AnnouncementsManager /> },
   ]
 
   return (
