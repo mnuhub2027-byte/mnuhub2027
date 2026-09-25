@@ -14,6 +14,8 @@ import {
   Calendar,
   Clock,
   MapPin,
+  Trash2,
+  Loader2,
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
@@ -338,10 +340,18 @@ function Attendance() {
 }
 
 function AnnouncementsManager() {
-  const { announcements, addAnnouncement, teamEvents } = useSystem()
+  const { announcements, addAnnouncement, deleteAnnouncement, teamEvents } = useSystem()
   const [showModal, setShowModal] = useState(false)
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('هل أنت متأكد من حذف هذا الإعلان؟')) return
+    setDeletingId(id)
+    await deleteAnnouncement(id)
+    setDeletingId(null)
+  }
 
   const handlePost = (e: React.FormEvent) => {
     e.preventDefault()
@@ -418,9 +428,19 @@ function AnnouncementsManager() {
                 <div className="flex items-center gap-2">
                   <p className="font-medium text-foreground">{a.title}</p>
                 </div>
-                <span className="shrink-0 text-xs text-muted-foreground font-sans">
-                  {a.date}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="shrink-0 text-xs text-muted-foreground font-sans">
+                    {a.date}
+                  </span>
+                  <button
+                    onClick={() => handleDelete(a.id)}
+                    disabled={deletingId === a.id}
+                    className="rounded-lg p-1.5 text-destructive/60 transition-colors hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
+                    title="حذف الإعلان"
+                  >
+                    {deletingId === a.id ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
+                  </button>
+                </div>
               </div>
               <p className="mt-2 text-sm text-foreground/80">{a.body}</p>
               <p className="mt-3 text-xs text-muted-foreground">— {a.author}</p>

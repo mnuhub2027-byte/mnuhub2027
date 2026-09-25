@@ -71,6 +71,7 @@ type SystemContextType = {
   // Events & Tasks
   announcements: Announcement[]
   addAnnouncement: (announcement: Omit<Announcement, 'id' | 'date'>) => void
+  deleteAnnouncement: (announcementId: string) => Promise<void>
   myTasks: Task[]
   toggleTaskStatus: (taskId: string) => void
   teamEvents: TeamEvent[]
@@ -625,9 +626,26 @@ export function SystemProvider({ children }: { children: ReactNode }) {
 
   // Announcements
   const addAnnouncement = async (annData: Omit<Announcement, 'id' | 'date'>) => {
-    if (!currentClubId) return
+    let clubId = currentClubId
+    if (!clubId) {
+      // Fallback: try to resolve clubId dynamically
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { toast.error('يجب تسجيل الدخول أولاً'); return }
+      const { data: membership } = await supabase.from('club_members').select('club_id').eq('user_id', user.id).eq('status', 'active').limit(1).maybeSingle()
+      if (membership) {
+        clubId = membership.club_id
+        setCurrentClubId(clubId)
+      } else {
+        const { data: adminRec } = await supabase.from('platform_admins').select('assigned_team_id').eq('email', user.email!).limit(1).maybeSingle()
+        if (adminRec?.assigned_team_id) {
+          clubId = adminRec.assigned_team_id
+          setCurrentClubId(clubId)
+        }
+      }
+      if (!clubId) { toast.error('لم يتم تحديد الفريق'); return }
+    }
     const { data, error } = await supabase.from('announcements').insert({
-      club_id: currentClubId,
+      club_id: clubId,
       title: annData.title,
       body: annData.body,
       author: annData.author,
@@ -641,7 +659,18 @@ export function SystemProvider({ children }: { children: ReactNode }) {
       id: data.id,
       date: new Date(data.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
     }, ...prev])
-    toast.success('Announcement posted to team members')
+    toast.success('تم نشر الإعلان بنجاح!')
+  }
+
+  // Delete Announcement
+  const deleteAnnouncement = async (announcementId: string) => {
+    const { error } = await supabase.from('announcements').delete().eq('id', announcementId)
+    if (error) {
+      toast.error('فشل حذف الإعلان: ' + error.message)
+      return
+    }
+    setAnnouncements((prev) => prev.filter((a) => a.id !== announcementId))
+    toast.success('تم حذف الإعلان بنجاح!')
   }
 
   // Tasks
@@ -711,6 +740,7 @@ export function SystemProvider({ children }: { children: ReactNode }) {
         promoteAssistantByEmail,
         announcements,
         addAnnouncement,
+        deleteAnnouncement,
         myTasks,
         toggleTaskStatus,
         teamEvents,
