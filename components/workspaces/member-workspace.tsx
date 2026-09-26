@@ -21,6 +21,9 @@ import {
   MessageCircle,
   FileText,
   ExternalLink,
+  ChevronDown,
+  ChevronUp,
+  RotateCcw,
 } from 'lucide-react'
 import { useSystem } from '@/lib/system-context'
 import { useRole } from '@/components/role-context'
@@ -216,104 +219,157 @@ function Calendar() {
 
 function Tasks() {
   const { myTasks, toggleTaskStatus } = useSystem()
+  const [showCompleted, setShowCompleted] = useState(false)
+
+  const pendingTasks = myTasks.filter((t) => t.status !== 'Done')
+  const completedTasks = myTasks.filter((t) => t.status === 'Done')
 
   return (
-    <div>
+    <div className="space-y-6">
       <SectionTitle
         title="المهام المسندة لي"
-        subtitle="متابعة وتنفيذ مهامك داخل الفريق."
+        subtitle="متابعة وتنفيذ مهامك داخل الفريق وتسليمها مباشرة."
       />
+
+      {/* Active / Pending Tasks */}
       <div className="space-y-3">
-        {myTasks.length === 0 ? (
-          <Panel className="py-10 text-center">
-            <ListTodo className="mx-auto size-10 text-muted-foreground/50 mb-3" />
-            <p className="text-sm font-medium text-foreground">لا توجد مهام مسندة لك حالياً</p>
+        {pendingTasks.length === 0 ? (
+          <Panel className="py-12 text-center">
+            <CheckCircle2 className="mx-auto size-12 text-chart-3/80 mb-3" />
+            <p className="text-base font-bold text-foreground">رائع! لا توجد مهام معلقة لديك حالياً 🎉</p>
             <p className="mt-1 text-xs text-muted-foreground">
-              سيتم إشعارك هنا عند إسناد مهام جديدة من قِبل إدارة الفريق.
+              لقد قمت بإنجاز كافة مهامك المسندة، أو لم يتم إسناد مهام جديدة بعد.
             </p>
           </Panel>
         ) : (
-          myTasks.map((t) => (
-            <Panel
-              key={t.id}
-              className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
-            >
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => toggleTaskStatus(t.id)}
-                  className={`flex size-5 shrink-0 items-center justify-center rounded-md border transition-colors ${
-                    t.status === 'Done'
-                      ? 'border-chart-3 bg-chart-3 text-chart-3-foreground'
-                      : 'border-input hover:border-primary'
-                  }`}
-                  title="تغيير حالة المهمة"
-                >
-                  {t.status === 'Done' && <CheckCircle2 className="size-4" />}
-                </button>
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p
-                      className={`font-medium text-sm ${
-                        t.status === 'Done'
-                          ? 'text-muted-foreground line-through'
-                          : 'text-foreground'
-                      }`}
+          <AnimatePresence mode="popLayout">
+            {pendingTasks.map((t) => (
+              <motion.div
+                key={t.id}
+                layout
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.2 } }}
+              >
+                <Panel className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-chart-4/10 text-chart-4">
+                      <ListTodo className="size-4" />
+                    </div>
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-semibold text-sm text-foreground">
+                          {t.title}
+                        </p>
+                        {t.assigneeName && t.assigneeName !== 'جميع أعضاء الفريق' ? (
+                          <span className="inline-flex items-center gap-1 rounded-md bg-chart-3/15 text-chart-3 px-2 py-0.5 text-[11px] font-semibold">
+                            <User className="size-3" />
+                            المكلف: {t.assigneeName}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 rounded-md bg-secondary text-muted-foreground px-2 py-0.5 text-[11px] font-medium">
+                            <Users className="size-3" />
+                            الجميع
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                        <span className="text-xs text-muted-foreground font-sans">
+                          تاريخ التسليم: {t.due}
+                        </span>
+                        {t.submissionType === 'whatsapp' && t.submissionValue && (
+                          <a
+                            href={`https://wa.me/${t.submissionValue.replace(/[^0-9]/g, '')}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-1 text-xs font-semibold text-emerald-400 hover:bg-emerald-500/25 transition-colors"
+                            title="إرسال الحل عبر واتساب"
+                          >
+                            <MessageCircle className="size-3.5" />
+                            <span>تسليم واتساب ({t.submissionValue})</span>
+                            <ExternalLink className="size-2.5" />
+                          </a>
+                        )}
+                        {t.submissionType === 'link' && t.submissionValue && (
+                          <a
+                            href={t.submissionValue.startsWith('http') ? t.submissionValue : `https://${t.submissionValue}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 rounded-lg bg-primary/15 border border-primary/30 px-2.5 py-1 text-xs font-semibold text-primary hover:bg-primary/25 transition-colors"
+                            title="فتح رابط التسليم"
+                          >
+                            <FileText className="size-3.5" />
+                            <span>رابط التسليم (Drive / فورم)</span>
+                            <ExternalLink className="size-2.5" />
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2 sm:self-center">
+                    <StatusBadge status={t.priority} />
+                    <StatusBadge status={t.status} />
+
+                    {/* Prominent Done Button */}
+                    <button
+                      onClick={() => toggleTaskStatus(t.id)}
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-chart-3 px-3 py-1.5 text-xs font-bold text-chart-3-foreground shadow-sm transition-all duration-200 hover:scale-[1.04] hover:bg-chart-3/90"
+                      title="تم التسليم - إنهاء المهمة"
                     >
-                      {t.title}
-                    </p>
-                    {t.assigneeName && t.assigneeName !== 'جميع أعضاء الفريق' ? (
-                      <span className="inline-flex items-center gap-1 rounded-md bg-chart-3/15 text-chart-3 px-2 py-0.5 text-[11px] font-semibold">
-                        <User className="size-3" />
-                        المكلف: {t.assigneeName}
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 rounded-md bg-secondary text-muted-foreground px-2 py-0.5 text-[11px] font-medium">
-                        <Users className="size-3" />
-                        الجميع
-                      </span>
-                    )}
+                      <CheckCircle2 className="size-3.5" />
+                      Done (تم التسليم)
+                    </button>
                   </div>
-                  <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                    <span className="text-xs text-muted-foreground font-sans">
-                      تاريخ التسليم: {t.due}
-                    </span>
-                    {t.submissionType === 'whatsapp' && t.submissionValue && (
-                      <a
-                        href={`https://wa.me/${t.submissionValue.replace(/[^0-9]/g, '')}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 text-xs font-semibold text-emerald-400 hover:bg-emerald-500/25 transition-colors"
-                        title="إرسال الحل عبر واتساب"
-                      >
-                        <MessageCircle className="size-3" />
-                        <span>تسليم واتساب ({t.submissionValue})</span>
-                        <ExternalLink className="size-2.5" />
-                      </a>
-                    )}
-                    {t.submissionType === 'link' && t.submissionValue && (
-                      <a
-                        href={t.submissionValue.startsWith('http') ? t.submissionValue : `https://${t.submissionValue}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 rounded-lg bg-primary/15 border border-primary/30 px-2 py-0.5 text-xs font-semibold text-primary hover:bg-primary/25 transition-colors"
-                        title="فتح رابط التسليم"
-                      >
-                        <FileText className="size-3" />
-                        <span>رابط التسليم (Drive / فورم)</span>
-                        <ExternalLink className="size-2.5" />
-                      </a>
-                    )}
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <StatusBadge status={t.priority} />
-                <StatusBadge status={t.status} />
-              </div>
-            </Panel>
-          ))
+                </Panel>
+              </motion.div>
+            ))}
+          </AnimatePresence>
         )}
       </div>
+
+      {/* Completed Tasks Accordion */}
+      {completedTasks.length > 0 && (
+        <div className="pt-2 border-t border-border/40">
+          <button
+            onClick={() => setShowCompleted(!showCompleted)}
+            className="flex items-center gap-2 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+          >
+            {showCompleted ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
+            <span>المهام المكتملة المسلمة ({completedTasks.length})</span>
+          </button>
+
+          {showCompleted && (
+            <div className="mt-3 space-y-2 opacity-80">
+              {completedTasks.map((t) => (
+                <Panel
+                  key={t.id}
+                  className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between py-2.5 bg-secondary/20"
+                >
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="size-4 text-chart-3 shrink-0" />
+                    <div>
+                      <p className="text-sm font-medium line-through text-muted-foreground">{t.title}</p>
+                      <span className="text-[11px] text-muted-foreground font-sans">تاريخ التسليم: {t.due}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="rounded-md bg-chart-3/15 px-2 py-0.5 text-[10px] font-bold text-chart-3">مكتملة ✓</span>
+                    <button
+                      onClick={() => toggleTaskStatus(t.id)}
+                      className="inline-flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-[11px] text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
+                      title="إعادة المهمة للمهام الحالية"
+                    >
+                      <RotateCcw className="size-3" />
+                      إعادة فتح
+                    </button>
+                  </div>
+                </Panel>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

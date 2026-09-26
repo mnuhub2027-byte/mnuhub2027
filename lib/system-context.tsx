@@ -876,6 +876,11 @@ export function SystemProvider({ children }: { children: ReactNode }) {
     await supabase.from('tasks').update({ status: nextStatus }).eq('id', taskId)
     
     setMyTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status: nextStatus } : t)))
+    if (nextStatus === 'Done') {
+      toast.success('تم تسليم المهمة وإنجازها بنجاح! أحسنت 🎉')
+    } else {
+      toast.info('تمت إعادة فتح المهمة.')
+    }
   }
 
   // Interviews
