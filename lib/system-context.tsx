@@ -83,6 +83,8 @@ type SystemContextType = {
   addAnnouncement: (announcement: Omit<Announcement, 'id' | 'date'>) => void
   deleteAnnouncement: (announcementId: string) => Promise<void>
   myTasks: Task[]
+  addTask: (task: Omit<Task, 'id'>) => Promise<void>
+  deleteTask: (taskId: string) => Promise<void>
   toggleTaskStatus: (taskId: string) => void
   teamEvents: TeamEvent[]
   deleteTeamEvent: (eventId: string) => Promise<void>
@@ -773,6 +775,56 @@ export function SystemProvider({ children }: { children: ReactNode }) {
   }
 
   // Tasks
+  const addTask = async (taskData: Omit<Task, 'id'>) => {
+    let clubId = currentClubId
+    if (!clubId) {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { toast.error('يجب تسجيل الدخول أولاً'); return }
+      const { data: membership } = await supabase.from('club_members').select('club_id').eq('user_id', user.id).eq('status', 'active').limit(1).maybeSingle()
+      if (membership) {
+        clubId = membership.club_id
+        setCurrentClubId(clubId)
+      } else {
+        const { data: adminRec } = await supabase.from('platform_admins').select('assigned_team_id').eq('email', user.email!).limit(1).maybeSingle()
+        if (adminRec?.assigned_team_id) {
+          clubId = adminRec.assigned_team_id
+          setCurrentClubId(clubId)
+        }
+      }
+      if (!clubId) { toast.error('لم يتم تحديد الفريق'); return }
+    }
+
+    const { data, error } = await supabase.from('tasks').insert({
+      club_id: clubId,
+      title: taskData.title,
+      due_date: taskData.due,
+      priority: taskData.priority,
+      status: taskData.status || 'To Do',
+    }).select().single()
+
+    if (error) { toast.error('فشل إنشاء المهمة: ' + error.message); return }
+
+    setMyTasks((prev) => [{
+      id: data.id,
+      title: data.title,
+      due: data.due_date || taskData.due,
+      priority: (data.priority || taskData.priority) as Task['priority'],
+      status: (data.status || 'To Do') as Task['status'],
+    }, ...prev])
+
+    toast.success('تم إسناد المهمة لأعضاء الفريق بنجاح!')
+  }
+
+  const deleteTask = async (taskId: string) => {
+    const { error } = await supabase.from('tasks').delete().eq('id', taskId)
+    if (error) {
+      toast.error('فشل حذف المهمة: ' + error.message)
+      return
+    }
+    setMyTasks((prev) => prev.filter((t) => t.id !== taskId))
+    toast.success('تم حذف المهمة بنجاح!')
+  }
+
   const toggleTaskStatus = async (taskId: string) => {
     const task = myTasks.find(t => t.id === taskId)
     if (!task) return
@@ -841,6 +893,8 @@ export function SystemProvider({ children }: { children: ReactNode }) {
         addAnnouncement,
         deleteAnnouncement,
         myTasks,
+        addTask,
+        deleteTask,
         toggleTaskStatus,
         teamEvents,
         deleteTeamEvent,

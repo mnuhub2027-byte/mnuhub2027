@@ -17,6 +17,7 @@ import {
   Megaphone,
   FileText,
   ExternalLink,
+  ListTodo,
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
@@ -439,6 +440,192 @@ function AnnouncementsManager() {
   )
 }
 
+function TasksManager() {
+  const { myTasks, addTask, deleteTask, toggleTaskStatus } = useSystem()
+  const [showModal, setShowModal] = useState(false)
+  const [title, setTitle] = useState('')
+  const [due, setDue] = useState('')
+  const [priority, setPriority] = useState<'High' | 'Medium' | 'Low'>('Medium')
+  const [loading, setLoading] = useState(false)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!title.trim()) return
+    setLoading(true)
+    try {
+      await addTask({
+        title: title.trim(),
+        due: due.trim() || new Date().toLocaleDateString('ar-EG', { month: 'short', day: 'numeric' }),
+        priority,
+        status: 'To Do',
+      })
+      setTitle('')
+      setDue('')
+      setPriority('Medium')
+      setShowModal(false)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('هل أنت متأكد من حذف هذه المهمة؟ ستُحذف أيضاً من لوحة تحكم أعضاء الفريق.')) return
+    setDeletingId(id)
+    try {
+      await deleteTask(id)
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <SectionTitle
+        title="إسناد وإدارة مهام الفريق"
+        subtitle="إنشاء وإرسال المهام لأعضاء الفريق ومتابعة حالة تنفيذها بشكل فوري."
+        action={
+          <button
+            onClick={() => setShowModal(true)}
+            className="inline-flex items-center gap-2 rounded-xl bg-chart-4 px-3.5 py-2 text-sm font-semibold text-chart-4-foreground transition-transform hover:scale-[1.03]"
+          >
+            <Plus className="size-4" />
+            إسناد مهمة جديدة
+          </button>
+        }
+      />
+
+      <div className="space-y-3">
+        {myTasks.length === 0 ? (
+          <Panel className="py-12 text-center">
+            <ListTodo className="mx-auto size-10 text-muted-foreground/50 mb-3" />
+            <p className="text-sm font-medium text-foreground">لا توجد مهام مسندة حالياً</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              اضغط على "إسناد مهمة جديدة" لإنشاء وإرسال أول مهمة لأعضاء التيم.
+            </p>
+          </Panel>
+        ) : (
+          myTasks.map((t) => (
+            <Panel
+              key={t.id}
+              className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
+            >
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => toggleTaskStatus(t.id)}
+                  className={`flex size-5 shrink-0 items-center justify-center rounded-md border transition-colors ${
+                    t.status === 'Done'
+                      ? 'border-chart-3 bg-chart-3 text-chart-3-foreground'
+                      : 'border-input hover:border-primary'
+                  }`}
+                  title="تغيير حالة المهمة"
+                >
+                  {t.status === 'Done' && <Check className="size-3.5" />}
+                </button>
+                <div>
+                  <p
+                    className={`font-medium text-sm ${
+                      t.status === 'Done'
+                        ? 'text-muted-foreground line-through'
+                        : 'text-foreground'
+                    }`}
+                  >
+                    {t.title}
+                  </p>
+                  <p className="mt-0.5 text-xs text-muted-foreground flex items-center gap-1 font-sans">
+                    <Calendar className="size-3 text-muted-foreground" />
+                    تاريخ التسليم: {t.due}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <StatusBadge status={t.priority} />
+                <StatusBadge status={t.status} />
+                <button
+                  onClick={() => handleDelete(t.id)}
+                  disabled={deletingId === t.id}
+                  className="rounded-lg p-1.5 text-destructive/60 transition-colors hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
+                  title="حذف المهمة"
+                >
+                  {deletingId === t.id ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="size-4" />
+                  )}
+                </button>
+              </div>
+            </Panel>
+          ))
+        )}
+      </div>
+
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md rounded-2xl border border-border bg-background p-6 shadow-2xl space-y-4">
+            <h3 className="font-display text-lg font-bold">إسناد مهمة جديدة للتيم</h3>
+            <p className="text-xs text-muted-foreground">
+              المهمة ستظهر مباشرة في لوحة تحكم أعضاء الفريق لمتابعة تنفيذها.
+            </p>
+            <form onSubmit={handleCreate} className="space-y-3">
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">عنوان المهمة</label>
+                <input
+                  required
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="مثال: تصميم بوست إعلان الورشة القادمة"
+                  className="mt-1 w-full rounded-xl border border-input bg-secondary/30 px-3 py-2 text-sm outline-none focus:border-chart-4"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">الأولوية</label>
+                  <select
+                    value={priority}
+                    onChange={(e) => setPriority(e.target.value as any)}
+                    className="mt-1 w-full rounded-xl border border-input bg-secondary/30 px-3 py-2 text-sm outline-none focus:border-chart-4"
+                  >
+                    <option value="High">عالية (High)</option>
+                    <option value="Medium">متوسطة (Medium)</option>
+                    <option value="Low">منخفضة (Low)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">تاريخ التسليم</label>
+                  <input
+                    value={due}
+                    onChange={(e) => setDue(e.target.value)}
+                    placeholder="مثال: 15 أكتوبر"
+                    className="mt-1 w-full rounded-xl border border-input bg-secondary/30 px-3 py-2 text-sm outline-none focus:border-chart-4"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setShowModal(false)}
+                  className="rounded-xl border border-border px-4 py-2 text-sm font-medium hover:bg-secondary"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="inline-flex items-center gap-2 rounded-xl bg-chart-4 px-4 py-2 text-sm font-semibold text-chart-4-foreground hover:opacity-90 disabled:opacity-50"
+                >
+                  {loading && <Loader2 className="size-4 animate-spin" />}
+                  إرسال المهمة
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function useMyClub() {
   const [club, setClub] = useState<{ name: string; faculty: string } | null>(null)
 
@@ -477,6 +664,7 @@ export function AssistantWorkspace() {
   const tabs: DashboardTab[] = [
     { id: 'pipeline', label: 'Recruitment Pipeline', icon: KanbanSquare, render: () => <Pipeline /> },
     { id: 'attendance', label: 'Attendance', icon: ClipboardCheck, render: () => <Attendance /> },
+    { id: 'tasks', label: 'Team Tasks', icon: ListTodo, render: () => <TasksManager /> },
     { id: 'announcements', label: 'Announcements', icon: Megaphone, render: () => <AnnouncementsManager /> },
   ]
 
