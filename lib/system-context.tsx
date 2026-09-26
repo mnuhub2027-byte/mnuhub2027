@@ -190,22 +190,35 @@ export function SystemProvider({ children }: { children: ReactNode }) {
         const { data: dbProms } = await supabase.from('promotion_requests').select('*').eq('club_id', activeClubId)
         const cvMap = new Map<string, { cv_link?: string; reason?: string; phone?: string; department?: string }>()
         if (dbProms) {
-           setPromotionRequests(dbProms.map(p => ({
-              id: p.id,
-              memberName: p.member_name,
-              memberInitials: (p.member_name || 'طالب').substring(0, 2).toUpperCase(),
-              department: p.department || '',
-              requestedRole: 'Vice Leader',
-              submittedAt: new Date(p.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-              status: p.status,
-              reason: p.reason || ''
-           })))
+           // Only actual promotion requests requested by members themselves
+           const actualPromotions = dbProms
+             .filter((p: any) => {
+               const r = (p.reason || '').trim()
+               if (r.startsWith('[طلب_انضمام]')) return false
+               // Filter out automatic application reasons from seed/test applications
+               if (r === 'طالب متحمس للانضمام للفريق') return false
+               if (r === 'طلب انضمام للفريق') return false
+               if (r === 'djh') return false
+               return true
+             })
+             .map((p: any) => ({
+                id: p.id,
+                memberName: p.member_name,
+                memberInitials: (p.member_name || 'طالب').substring(0, 2).toUpperCase(),
+                department: p.department || '',
+                requestedRole: 'Vice Leader' as const,
+                submittedAt: new Date(p.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+                status: p.status,
+                reason: (p.reason || '').replace(/^\[ترقية_مساعد\]\s*/, '')
+             }))
+           setPromotionRequests(actualPromotions)
 
            dbProms.forEach((p: any) => {
              if (p.user_id) {
+               const cleanReason = (p.reason || '').replace(/^\[طلب_انضمام\]\s*/, '').replace(/^\[ترقية_مساعد\]\s*/, '')
                cvMap.set(p.user_id, {
                  cv_link: p.cv_link || '',
-                 reason: p.reason || '',
+                 reason: cleanReason,
                  phone: p.phone || '',
                  department: p.department || '',
                })
@@ -476,7 +489,7 @@ export function SystemProvider({ children }: { children: ReactNode }) {
 
     if (error) { toast.error('فشل تقديم الطلب: ' + error.message); return }
 
-    // 3. Save CV link and reason into promotion_requests
+    // 3. Save CV link and reason tagged as join request so it does not appear in Leader promotions
     if (cvLink || note) {
       await supabase.from('promotion_requests').insert({
         club_id: clubId,
@@ -485,7 +498,7 @@ export function SystemProvider({ children }: { children: ReactNode }) {
         department: faculty || 'غير محدد',
         phone: whatsapp || '',
         cv_link: cvLink || '',
-        reason: note || 'طلب انضمام للفريق',
+        reason: `[طلب_انضمام] ${note || 'طلب انضمام للفريق'}`,
         status: 'Pending'
       })
     }
