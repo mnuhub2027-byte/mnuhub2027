@@ -42,6 +42,8 @@ type MemberProfile = {
   clubName: string
   joinedAt: string
   role: string
+  userId?: string
+  email?: string
 }
 
 function useMemberProfile(): MemberProfile | null {
@@ -78,7 +80,15 @@ function useMemberProfile(): MemberProfile | null {
         ? new Date(mem.created_at).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })
         : '—'
 
-      setProfile({ name: fullName, initials, clubName, joinedAt, role: mem?.role || 'member' })
+      setProfile({
+        name: fullName,
+        initials,
+        clubName,
+        joinedAt,
+        role: mem?.role || 'member',
+        userId: user.id,
+        email: user.email,
+      })
     })
   }, [])
 
@@ -218,11 +228,44 @@ function Calendar() {
 }
 
 function Tasks() {
-  const { myTasks, toggleTaskStatus } = useSystem()
+  const { myTasks, toggleTaskStatus, members } = useSystem()
+  const profile = useMemberProfile()
   const [showCompleted, setShowCompleted] = useState(false)
 
-  const pendingTasks = myTasks.filter((t) => t.status !== 'Done')
-  const completedTasks = myTasks.filter((t) => t.status === 'Done')
+  // Find corresponding member record from the team context
+  const teamMember = members.find(
+    (m) =>
+      (profile?.userId && m.userId === profile.userId) ||
+      (profile?.email && m.email && m.email.toLowerCase() === profile.email.toLowerCase()) ||
+      (profile?.name && m.name.trim().toLowerCase() === profile.name.trim().toLowerCase())
+  )
+
+  // Only show tasks assigned to this member specifically, or to everyone
+  const visibleTasks = myTasks.filter((t) => {
+    // If assigned to all members, or no specific assignee was set
+    if (!t.assigneeName || t.assigneeName === 'جميع أعضاء الفريق') {
+      return true
+    }
+
+    const target = t.assigneeName.trim().toLowerCase()
+
+    if (profile?.name && target === profile.name.trim().toLowerCase()) {
+      return true
+    }
+
+    if (teamMember && target === teamMember.name.trim().toLowerCase()) {
+      return true
+    }
+
+    if (profile?.email && target === profile.email.trim().toLowerCase()) {
+      return true
+    }
+
+    return false
+  })
+
+  const pendingTasks = visibleTasks.filter((t) => t.status !== 'Done')
+  const completedTasks = visibleTasks.filter((t) => t.status === 'Done')
 
   return (
     <div className="space-y-6">

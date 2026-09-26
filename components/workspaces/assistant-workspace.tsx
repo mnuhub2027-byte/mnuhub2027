@@ -449,22 +449,32 @@ function AnnouncementsManager() {
   )
 }
 
-function useCurrentMemberName() {
-  const [name, setName] = useState<string | null>(null)
+type AdminInfo = {
+  name: string
+  email: string
+  userId: string
+}
+
+function useCurrentAdminInfo(): AdminInfo | null {
+  const [info, setInfo] = useState<AdminInfo | null>(null)
   useEffect(() => {
     const supabase = createClient()
     supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (!user) return
       const { data: prof } = await supabase.from('profiles').select('full_name').eq('id', user.id).single()
-      setName(prof?.full_name || user.email || null)
+      setInfo({
+        name: prof?.full_name || user.email || '',
+        email: user.email || '',
+        userId: user.id,
+      })
     })
   }, [])
-  return name
+  return info
 }
 
 function TasksManager() {
   const { myTasks, addTask, deleteTask, toggleTaskStatus, members } = useSystem()
-  const currentName = useCurrentMemberName()
+  const adminInfo = useCurrentAdminInfo()
   const [activeTab, setActiveTab] = useState<'my' | 'manage'>('my')
   const [showModal, setShowModal] = useState(false)
   const [title, setTitle] = useState('')
@@ -526,13 +536,28 @@ function TasksManager() {
     }
   }
 
-  // Tasks assigned TO me (this admin) by the leader
-  const myAssignedTasks = myTasks.filter(
-    (t) =>
-      currentName &&
-      (t.assigneeName === currentName ||
-        t.assigneeName === 'جميع أعضاء الفريق')
+  // Find this admin's record in members (role === 'Vice Leader')
+  const currentMemberInTeam = members.find(
+    (m) =>
+      (adminInfo?.userId && m.userId === adminInfo.userId) ||
+      (adminInfo?.email && m.email && m.email.toLowerCase() === adminInfo.email.toLowerCase()) ||
+      (adminInfo?.name && m.name.trim().toLowerCase() === adminInfo.name.trim().toLowerCase())
   )
+
+  // Tasks assigned TO me (this admin) by the leader or team
+  const myAssignedTasks = myTasks.filter((t) => {
+    if (!t.assigneeName) return false
+    if (t.assigneeName === 'جميع أعضاء الفريق') return true
+
+    const target = t.assigneeName.trim().toLowerCase()
+
+    if (adminInfo?.name && target === adminInfo.name.trim().toLowerCase()) return true
+    if (currentMemberInTeam && target === currentMemberInTeam.name.trim().toLowerCase()) return true
+    if (adminInfo?.email && target === adminInfo.email.trim().toLowerCase()) return true
+    if (target.includes('أدمن') || target.includes('vice leader') || target.includes('مساعد')) return true
+
+    return false
+  })
   const myPendingAssigned = myAssignedTasks.filter((t) => t.status !== 'Done')
   const myCompletedAssigned = myAssignedTasks.filter((t) => t.status === 'Done')
   const [showCompletedMine, setShowCompletedMine] = useState(false)
