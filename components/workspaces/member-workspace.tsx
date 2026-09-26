@@ -18,6 +18,9 @@ import {
   Calendar as CalendarIcon,
   Megaphone,
   User,
+  MessageCircle,
+  FileText,
+  ExternalLink,
 } from 'lucide-react'
 import { useSystem } from '@/lib/system-context'
 import { useRole } from '@/components/role-context'
@@ -270,9 +273,37 @@ function Tasks() {
                       </span>
                     )}
                   </div>
-                  <p className="mt-1 text-xs text-muted-foreground font-sans">
-                    تاريخ التسليم: {t.due}
-                  </p>
+                  <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                    <span className="text-xs text-muted-foreground font-sans">
+                      تاريخ التسليم: {t.due}
+                    </span>
+                    {t.submissionType === 'whatsapp' && t.submissionValue && (
+                      <a
+                        href={`https://wa.me/${t.submissionValue.replace(/[^0-9]/g, '')}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 text-xs font-semibold text-emerald-400 hover:bg-emerald-500/25 transition-colors"
+                        title="إرسال الحل عبر واتساب"
+                      >
+                        <MessageCircle className="size-3" />
+                        <span>تسليم واتساب ({t.submissionValue})</span>
+                        <ExternalLink className="size-2.5" />
+                      </a>
+                    )}
+                    {t.submissionType === 'link' && t.submissionValue && (
+                      <a
+                        href={t.submissionValue.startsWith('http') ? t.submissionValue : `https://${t.submissionValue}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 rounded-lg bg-primary/15 border border-primary/30 px-2 py-0.5 text-xs font-semibold text-primary hover:bg-primary/25 transition-colors"
+                        title="فتح رابط التسليم"
+                      >
+                        <FileText className="size-3" />
+                        <span>رابط التسليم (Drive / فورم)</span>
+                        <ExternalLink className="size-2.5" />
+                      </a>
+                    )}
+                  </div>
                 </div>
               </div>
               <div className="flex items-center gap-2">

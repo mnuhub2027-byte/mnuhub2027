@@ -21,6 +21,8 @@ import {
   User,
   Users,
   Search,
+  MessageCircle,
+  Link2,
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
@@ -457,6 +459,10 @@ function TasksManager() {
   const [selectedAssignee, setSelectedAssignee] = useState<{ id?: string; name: string } | null>(null)
   const [showAssigneeDropdown, setShowAssigneeDropdown] = useState(false)
 
+  // Submission method state
+  const [submissionType, setSubmissionType] = useState<'none' | 'whatsapp' | 'link'>('none')
+  const [submissionValue, setSubmissionValue] = useState('')
+
   const filteredMembers = members.filter(
     (m) =>
       m.name.toLowerCase().includes(assigneeSearch.toLowerCase()) ||
@@ -475,12 +481,16 @@ function TasksManager() {
         status: 'To Do',
         assigneeName: selectedAssignee ? selectedAssignee.name : 'جميع أعضاء الفريق',
         assigneeId: selectedAssignee?.id,
+        submissionType: submissionType !== 'none' ? submissionType : undefined,
+        submissionValue: submissionType !== 'none' ? submissionValue.trim() : undefined,
       })
       setTitle('')
       setDue('')
       setPriority('Medium')
       setSelectedAssignee(null)
       setAssigneeSearch('')
+      setSubmissionType('none')
+      setSubmissionValue('')
       setShowModal(false)
     } finally {
       setLoading(false)
@@ -501,7 +511,7 @@ function TasksManager() {
     <div className="space-y-6">
       <SectionTitle
         title="إسناد وإدارة مهام الفريق"
-        subtitle="إنشاء وإرسال المهام لأعضاء محددين أو لجميع أعضاء الفريق ومتابعة حالة تنفيذها."
+        subtitle="إنشاء وإرسال المهام لأعضاء محددين أو لجميع أعضاء الفريق ومتابعة حالة تنفيذها وطريقة استلامها."
         action={
           <button
             onClick={() => setShowModal(true)}
@@ -563,10 +573,37 @@ function TasksManager() {
                       </span>
                     )}
                   </div>
-                  <p className="mt-1 text-xs text-muted-foreground flex items-center gap-1 font-sans">
-                    <Calendar className="size-3 text-muted-foreground" />
-                    تاريخ التسليم: {t.due}
-                  </p>
+                  <div className="mt-1 flex flex-wrap items-center gap-2">
+                    <span className="text-xs text-muted-foreground flex items-center gap-1 font-sans">
+                      <Calendar className="size-3 text-muted-foreground" />
+                      تاريخ التسليم: {t.due}
+                    </span>
+                    {t.submissionType === 'whatsapp' && t.submissionValue && (
+                      <a
+                        href={`https://wa.me/${t.submissionValue.replace(/[^0-9]/g, '')}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 rounded-md bg-emerald-500/15 text-emerald-400 px-2 py-0.5 text-[11px] font-medium hover:bg-emerald-500/25 transition-colors"
+                        title="واتساب التسليم"
+                      >
+                        <MessageCircle className="size-3" />
+                        واتساب: {t.submissionValue}
+                      </a>
+                    )}
+                    {t.submissionType === 'link' && t.submissionValue && (
+                      <a
+                        href={t.submissionValue.startsWith('http') ? t.submissionValue : `https://${t.submissionValue}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 rounded-md bg-primary/15 text-primary px-2 py-0.5 text-[11px] font-medium hover:bg-primary/25 transition-colors"
+                        title="رابط التسليم"
+                      >
+                        <FileText className="size-3" />
+                        رابط التسليم / Drive
+                        <ExternalLink className="size-2.5" />
+                      </a>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -596,7 +633,7 @@ function TasksManager() {
           <div className="w-full max-w-md rounded-2xl border border-border bg-background p-6 shadow-2xl space-y-4">
             <h3 className="font-display text-lg font-bold">إسناد مهمة جديدة للتيم</h3>
             <p className="text-xs text-muted-foreground">
-              المهمة ستظهر مباشرة في لوحة تحكم أعضاء الفريق لمتابعة تنفيذها.
+              المهمة وطريقة تسليمها ستظهر مباشرة في لوحة تحكم أعضاء الفريق.
             </p>
             <form onSubmit={handleCreate} className="space-y-3">
               <div>
@@ -696,6 +733,87 @@ function TasksManager() {
                         )}
                       </div>
                     )}
+                  </div>
+                )}
+              </div>
+
+              {/* Submission Method Selection */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">
+                  طريقة التسليم المطلوبة من العضو
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSubmissionType('none')
+                      setSubmissionValue('')
+                    }}
+                    className={`rounded-xl border py-2 text-xs font-medium transition-colors ${
+                      submissionType === 'none'
+                        ? 'border-chart-4 bg-chart-4/15 text-chart-4 font-semibold'
+                        : 'border-border bg-secondary/30 text-muted-foreground hover:bg-secondary'
+                    }`}
+                  >
+                    بدون رابط
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSubmissionType('whatsapp')}
+                    className={`flex items-center justify-center gap-1.5 rounded-xl border py-2 text-xs font-medium transition-colors ${
+                      submissionType === 'whatsapp'
+                        ? 'border-emerald-500 bg-emerald-500/15 text-emerald-400 font-semibold'
+                        : 'border-border bg-secondary/30 text-muted-foreground hover:bg-secondary'
+                    }`}
+                  >
+                    <MessageCircle className="size-3.5" />
+                    واتساب
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSubmissionType('link')}
+                    className={`flex items-center justify-center gap-1.5 rounded-xl border py-2 text-xs font-medium transition-colors ${
+                      submissionType === 'link'
+                        ? 'border-primary bg-primary/15 text-primary font-semibold'
+                        : 'border-border bg-secondary/30 text-muted-foreground hover:bg-secondary'
+                    }`}
+                  >
+                    <Link2 className="size-3.5" />
+                    رابط / Drive
+                  </button>
+                </div>
+
+                {submissionType === 'whatsapp' && (
+                  <div className="mt-2 space-y-1">
+                    <label className="text-[11px] text-muted-foreground">رقم الواتساب لاستلام الحل</label>
+                    <div className="relative">
+                      <MessageCircle className="absolute right-3 top-2.5 size-4 text-emerald-400" />
+                      <input
+                        required
+                        type="tel"
+                        value={submissionValue}
+                        onChange={(e) => setSubmissionValue(e.target.value)}
+                        placeholder="مثال: 01012345678 أو +2010..."
+                        className="w-full rounded-xl border border-input bg-secondary/30 pr-9 pl-3 py-2 text-sm outline-none focus:border-emerald-500 font-sans"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {submissionType === 'link' && (
+                  <div className="mt-2 space-y-1">
+                    <label className="text-[11px] text-muted-foreground">رابط الاستلام (مجلد Google Drive أو فورم)</label>
+                    <div className="relative">
+                      <FileText className="absolute right-3 top-2.5 size-4 text-primary" />
+                      <input
+                        required
+                        type="url"
+                        value={submissionValue}
+                        onChange={(e) => setSubmissionValue(e.target.value)}
+                        placeholder="https://drive.google.com/drive/folders/..."
+                        className="w-full rounded-xl border border-input bg-secondary/30 pr-9 pl-3 py-2 text-sm outline-none focus:border-primary font-sans text-left"
+                      />
+                    </div>
                   </div>
                 )}
               </div>

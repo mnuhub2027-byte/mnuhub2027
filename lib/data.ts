@@ -461,6 +461,8 @@ export type Task = {
   status: 'To Do' | 'In Progress' | 'Done'
   assigneeName?: string
   assigneeId?: string
+  submissionType?: 'whatsapp' | 'link' | 'none'
+  submissionValue?: string
 }
 
 export const myTasks: Task[] = [

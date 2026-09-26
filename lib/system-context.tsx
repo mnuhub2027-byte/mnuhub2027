@@ -301,15 +301,35 @@ export function SystemProvider({ children }: { children: ReactNode }) {
            setMyTasks(dbTasks.map(t => {
              let cleanTitle = t.title || ''
              let assigneeName: string | undefined = undefined
-             const match = cleanTitle.match(/^\[المكلف:\s*([^\]]+)\]\s*(.*)$/)
-             if (match) {
-               assigneeName = match[1]
-               cleanTitle = match[2]
+             let submissionType: 'whatsapp' | 'link' | 'none' | undefined = undefined
+             let submissionValue: string | undefined = undefined
+
+             const assigneeMatch = cleanTitle.match(/\[المكلف:\s*([^\]]+)\]/)
+             if (assigneeMatch) {
+               assigneeName = assigneeMatch[1].trim()
+               cleanTitle = cleanTitle.replace(assigneeMatch[0], '')
              }
+
+             const whatsappMatch = cleanTitle.match(/\[تسليم_واتساب:\s*([^\]]+)\]/)
+             if (whatsappMatch) {
+               submissionType = 'whatsapp'
+               submissionValue = whatsappMatch[1].trim()
+               cleanTitle = cleanTitle.replace(whatsappMatch[0], '')
+             }
+
+             const linkMatch = cleanTitle.match(/\[تسليم_رابط:\s*([^\]]+)\]/)
+             if (linkMatch) {
+               submissionType = 'link'
+               submissionValue = linkMatch[1].trim()
+               cleanTitle = cleanTitle.replace(linkMatch[0], '')
+             }
+
              return {
                id: t.id,
-               title: cleanTitle,
+               title: cleanTitle.trim(),
                assigneeName,
+               submissionType,
+               submissionValue,
                due: t.due_date || '',
                priority: t.priority || 'Medium',
                status: t.status
@@ -804,9 +824,15 @@ export function SystemProvider({ children }: { children: ReactNode }) {
       if (!clubId) { toast.error('لم يتم تحديد الفريق'); return }
     }
 
-    const storedTitle = taskData.assigneeName && taskData.assigneeName !== 'جميع أعضاء الفريق'
-      ? `[المكلف: ${taskData.assigneeName}] ${taskData.title}`
-      : taskData.title
+    let storedTitle = taskData.title
+    if (taskData.assigneeName && taskData.assigneeName !== 'جميع أعضاء الفريق') {
+      storedTitle = `[المكلف: ${taskData.assigneeName}] ${storedTitle}`
+    }
+    if (taskData.submissionType === 'whatsapp' && taskData.submissionValue) {
+      storedTitle = `[تسليم_واتساب: ${taskData.submissionValue.trim()}] ${storedTitle}`
+    } else if (taskData.submissionType === 'link' && taskData.submissionValue) {
+      storedTitle = `[تسليم_رابط: ${taskData.submissionValue.trim()}] ${storedTitle}`
+    }
 
     const { data, error } = await supabase.from('tasks').insert({
       club_id: clubId,
@@ -822,6 +848,8 @@ export function SystemProvider({ children }: { children: ReactNode }) {
       id: data.id,
       title: taskData.title,
       assigneeName: taskData.assigneeName,
+      submissionType: taskData.submissionType,
+      submissionValue: taskData.submissionValue,
       due: data.due_date || taskData.due,
       priority: (data.priority || taskData.priority) as Task['priority'],
       status: (data.status || 'To Do') as Task['status'],
