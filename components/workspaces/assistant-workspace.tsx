@@ -18,6 +18,9 @@ import {
   FileText,
   ExternalLink,
   ListTodo,
+  User,
+  Users,
+  Search,
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
@@ -441,13 +444,24 @@ function AnnouncementsManager() {
 }
 
 function TasksManager() {
-  const { myTasks, addTask, deleteTask, toggleTaskStatus } = useSystem()
+  const { myTasks, addTask, deleteTask, toggleTaskStatus, members } = useSystem()
   const [showModal, setShowModal] = useState(false)
   const [title, setTitle] = useState('')
   const [due, setDue] = useState('')
   const [priority, setPriority] = useState<'High' | 'Medium' | 'Low'>('Medium')
   const [loading, setLoading] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  
+  // Member selection state
+  const [assigneeSearch, setAssigneeSearch] = useState('')
+  const [selectedAssignee, setSelectedAssignee] = useState<{ id?: string; name: string } | null>(null)
+  const [showAssigneeDropdown, setShowAssigneeDropdown] = useState(false)
+
+  const filteredMembers = members.filter(
+    (m) =>
+      m.name.toLowerCase().includes(assigneeSearch.toLowerCase()) ||
+      m.department.toLowerCase().includes(assigneeSearch.toLowerCase())
+  )
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -459,10 +473,14 @@ function TasksManager() {
         due: due.trim() || new Date().toLocaleDateString('ar-EG', { month: 'short', day: 'numeric' }),
         priority,
         status: 'To Do',
+        assigneeName: selectedAssignee ? selectedAssignee.name : 'جميع أعضاء الفريق',
+        assigneeId: selectedAssignee?.id,
       })
       setTitle('')
       setDue('')
       setPriority('Medium')
+      setSelectedAssignee(null)
+      setAssigneeSearch('')
       setShowModal(false)
     } finally {
       setLoading(false)
@@ -483,7 +501,7 @@ function TasksManager() {
     <div className="space-y-6">
       <SectionTitle
         title="إسناد وإدارة مهام الفريق"
-        subtitle="إنشاء وإرسال المهام لأعضاء الفريق ومتابعة حالة تنفيذها بشكل فوري."
+        subtitle="إنشاء وإرسال المهام لأعضاء محددين أو لجميع أعضاء الفريق ومتابعة حالة تنفيذها."
         action={
           <button
             onClick={() => setShowModal(true)}
@@ -523,16 +541,29 @@ function TasksManager() {
                   {t.status === 'Done' && <Check className="size-3.5" />}
                 </button>
                 <div>
-                  <p
-                    className={`font-medium text-sm ${
-                      t.status === 'Done'
-                        ? 'text-muted-foreground line-through'
-                        : 'text-foreground'
-                    }`}
-                  >
-                    {t.title}
-                  </p>
-                  <p className="mt-0.5 text-xs text-muted-foreground flex items-center gap-1 font-sans">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p
+                      className={`font-medium text-sm ${
+                        t.status === 'Done'
+                          ? 'text-muted-foreground line-through'
+                          : 'text-foreground'
+                      }`}
+                    >
+                      {t.title}
+                    </p>
+                    {t.assigneeName && t.assigneeName !== 'جميع أعضاء الفريق' ? (
+                      <span className="inline-flex items-center gap-1 rounded-md bg-chart-4/15 text-chart-4 px-2 py-0.5 text-[11px] font-semibold">
+                        <User className="size-3" />
+                        المكلف: {t.assigneeName}
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 rounded-md bg-secondary text-muted-foreground px-2 py-0.5 text-[11px] font-medium">
+                        <Users className="size-3" />
+                        الجميع
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground flex items-center gap-1 font-sans">
                     <Calendar className="size-3 text-muted-foreground" />
                     تاريخ التسليم: {t.due}
                   </p>
@@ -578,6 +609,97 @@ function TasksManager() {
                   className="mt-1 w-full rounded-xl border border-input bg-secondary/30 px-3 py-2 text-sm outline-none focus:border-chart-4"
                 />
               </div>
+
+              {/* Member Search / Selector */}
+              <div className="relative">
+                <label className="text-xs font-medium text-muted-foreground flex items-center justify-between">
+                  <span>المكلف بالمهمة</span>
+                  {selectedAssignee && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedAssignee(null)
+                        setAssigneeSearch('')
+                      }}
+                      className="text-[11px] text-chart-4 hover:underline"
+                    >
+                      تغيير للجميع
+                    </button>
+                  )}
+                </label>
+
+                {selectedAssignee ? (
+                  <div className="mt-1 flex items-center justify-between rounded-xl border border-chart-4/40 bg-chart-4/10 px-3 py-2 text-sm">
+                    <span className="flex items-center gap-2 font-medium text-chart-4">
+                      <User className="size-4" />
+                      {selectedAssignee.name}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedAssignee(null)}
+                      className="rounded-full p-1 hover:bg-chart-4/20 text-chart-4"
+                    >
+                      <X className="size-3.5" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="mt-1 space-y-1">
+                    <div className="relative">
+                      <Search className="absolute right-3 top-2.5 size-4 text-muted-foreground" />
+                      <input
+                        value={assigneeSearch}
+                        onChange={(e) => {
+                          setAssigneeSearch(e.target.value)
+                          setShowAssigneeDropdown(true)
+                        }}
+                        onFocus={() => setShowAssigneeDropdown(true)}
+                        placeholder="ابحث عن عضو بالاسم أو الكلية (أو اتركها للجميع)..."
+                        className="w-full rounded-xl border border-input bg-secondary/30 pr-9 pl-3 py-2 text-sm outline-none focus:border-chart-4"
+                      />
+                    </div>
+
+                    {showAssigneeDropdown && (
+                      <div className="max-h-40 overflow-y-auto rounded-xl border border-border bg-card p-1 shadow-lg space-y-0.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedAssignee(null)
+                            setAssigneeSearch('')
+                            setShowAssigneeDropdown(false)
+                          }}
+                          className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-foreground/90 hover:bg-secondary text-right"
+                        >
+                          <Users className="size-3.5 text-muted-foreground" />
+                          <span className="font-semibold">📌 جميع أعضاء الفريق (الافتراضي)</span>
+                        </button>
+                        {filteredMembers.map((m) => (
+                          <button
+                            key={m.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedAssignee({ id: m.id, name: m.name })
+                              setShowAssigneeDropdown(false)
+                            }}
+                            className="flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-xs text-foreground hover:bg-secondary text-right"
+                          >
+                            <span className="flex items-center gap-2">
+                              <span className="flex size-5 items-center justify-center rounded-full bg-primary/20 text-[10px] font-bold text-primary">
+                                {m.initials}
+                              </span>
+                              <span className="font-medium">{m.name}</span>
+                            </span>
+                            <span className="text-[10px] text-muted-foreground">{m.department} · {m.role}</span>
+                          </button>
+                        ))}
+                        {filteredMembers.length === 0 && (
+                          <p className="p-2 text-center text-xs text-muted-foreground">لا يوجد عضو بهذا الاسم</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-medium text-muted-foreground">الأولوية</label>

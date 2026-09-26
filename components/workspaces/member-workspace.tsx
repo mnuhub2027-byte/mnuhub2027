@@ -17,6 +17,7 @@ import {
   X,
   Calendar as CalendarIcon,
   Megaphone,
+  User,
 } from 'lucide-react'
 import { useSystem } from '@/lib/system-context'
 import { useRole } from '@/components/role-context'
@@ -220,43 +221,67 @@ function Tasks() {
         subtitle="متابعة وتنفيذ مهامك داخل الفريق."
       />
       <div className="space-y-3">
-        {myTasks.map((t) => (
-          <Panel
-            key={t.id}
-            className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
-          >
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => toggleTaskStatus(t.id)}
-                className={`flex size-5 shrink-0 items-center justify-center rounded-md border transition-colors ${
-                  t.status === 'Done'
-                    ? 'border-chart-3 bg-chart-3 text-chart-3-foreground'
-                    : 'border-input hover:border-primary'
-                }`}
-              >
-                {t.status === 'Done' && <CheckCircle2 className="size-4" />}
-              </button>
-              <div>
-                <p
-                  className={`font-medium text-sm ${
-                    t.status === 'Done'
-                      ? 'text-muted-foreground line-through'
-                      : 'text-foreground'
-                  }`}
-                >
-                  {t.title}
-                </p>
-                <p className="mt-0.5 text-xs text-muted-foreground font-sans">
-                  تاريخ التسليم: {t.due}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <StatusBadge status={t.priority} />
-              <StatusBadge status={t.status} />
-            </div>
+        {myTasks.length === 0 ? (
+          <Panel className="py-10 text-center">
+            <ListTodo className="mx-auto size-10 text-muted-foreground/50 mb-3" />
+            <p className="text-sm font-medium text-foreground">لا توجد مهام مسندة لك حالياً</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              سيتم إشعارك هنا عند إسناد مهام جديدة من قِبل إدارة الفريق.
+            </p>
           </Panel>
-        ))}
+        ) : (
+          myTasks.map((t) => (
+            <Panel
+              key={t.id}
+              className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
+            >
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => toggleTaskStatus(t.id)}
+                  className={`flex size-5 shrink-0 items-center justify-center rounded-md border transition-colors ${
+                    t.status === 'Done'
+                      ? 'border-chart-3 bg-chart-3 text-chart-3-foreground'
+                      : 'border-input hover:border-primary'
+                  }`}
+                  title="تغيير حالة المهمة"
+                >
+                  {t.status === 'Done' && <CheckCircle2 className="size-4" />}
+                </button>
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p
+                      className={`font-medium text-sm ${
+                        t.status === 'Done'
+                          ? 'text-muted-foreground line-through'
+                          : 'text-foreground'
+                      }`}
+                    >
+                      {t.title}
+                    </p>
+                    {t.assigneeName && t.assigneeName !== 'جميع أعضاء الفريق' ? (
+                      <span className="inline-flex items-center gap-1 rounded-md bg-chart-3/15 text-chart-3 px-2 py-0.5 text-[11px] font-semibold">
+                        <User className="size-3" />
+                        المكلف: {t.assigneeName}
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 rounded-md bg-secondary text-muted-foreground px-2 py-0.5 text-[11px] font-medium">
+                        <Users className="size-3" />
+                        الجميع
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground font-sans">
+                    تاريخ التسليم: {t.due}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <StatusBadge status={t.priority} />
+                <StatusBadge status={t.status} />
+              </div>
+            </Panel>
+          ))
+        )}
       </div>
     </div>
   )

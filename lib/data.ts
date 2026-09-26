@@ -459,6 +459,8 @@ export type Task = {
   due: string
   priority: 'High' | 'Medium' | 'Low'
   status: 'To Do' | 'In Progress' | 'Done'
+  assigneeName?: string
+  assigneeId?: string
 }
 
 export const myTasks: Task[] = [

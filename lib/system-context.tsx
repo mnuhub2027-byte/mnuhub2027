@@ -298,13 +298,23 @@ export function SystemProvider({ children }: { children: ReactNode }) {
         // Load Tasks
         const { data: dbTasks } = await supabase.from('tasks').select('*').eq('club_id', activeClubId)
         if (dbTasks) {
-           setMyTasks(dbTasks.map(t => ({
-              id: t.id,
-              title: t.title,
-              due: t.due_date || '',
-              priority: t.priority || 'Medium',
-              status: t.status
-           })))
+           setMyTasks(dbTasks.map(t => {
+             let cleanTitle = t.title || ''
+             let assigneeName: string | undefined = undefined
+             const match = cleanTitle.match(/^\[المكلف:\s*([^\]]+)\]\s*(.*)$/)
+             if (match) {
+               assigneeName = match[1]
+               cleanTitle = match[2]
+             }
+             return {
+               id: t.id,
+               title: cleanTitle,
+               assigneeName,
+               due: t.due_date || '',
+               priority: t.priority || 'Medium',
+               status: t.status
+             }
+           }))
         }
 
         // Load Events
@@ -794,9 +804,13 @@ export function SystemProvider({ children }: { children: ReactNode }) {
       if (!clubId) { toast.error('لم يتم تحديد الفريق'); return }
     }
 
+    const storedTitle = taskData.assigneeName && taskData.assigneeName !== 'جميع أعضاء الفريق'
+      ? `[المكلف: ${taskData.assigneeName}] ${taskData.title}`
+      : taskData.title
+
     const { data, error } = await supabase.from('tasks').insert({
       club_id: clubId,
-      title: taskData.title,
+      title: storedTitle,
       due_date: taskData.due,
       priority: taskData.priority,
       status: taskData.status || 'To Do',
@@ -806,7 +820,8 @@ export function SystemProvider({ children }: { children: ReactNode }) {
 
     setMyTasks((prev) => [{
       id: data.id,
-      title: data.title,
+      title: taskData.title,
+      assigneeName: taskData.assigneeName,
       due: data.due_date || taskData.due,
       priority: (data.priority || taskData.priority) as Task['priority'],
       status: (data.status || 'To Do') as Task['status'],
