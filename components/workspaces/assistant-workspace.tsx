@@ -3,7 +3,6 @@
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   KanbanSquare,
-  CalendarClock,
   ClipboardCheck,
   ChevronRight,
   Plus,
@@ -230,133 +229,6 @@ function Pipeline() {
           )
         })}
       </div>
-    </div>
-  )
-}
-
-function Interviews() {
-  const { interviews, addInterview } = useSystem()
-  const [showModal, setShowModal] = useState(false)
-  const [applicant, setApplicant] = useState('')
-  const [role, setRole] = useState('')
-  const [date, setDate] = useState('Mar 18')
-  const [time, setTime] = useState('4:00 PM')
-  const [interviewer, setInterviewer] = useState('نور السيد (مساعد الليدر)')
-
-  const handleSchedule = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!applicant || !role) return
-    addInterview({ applicant, role, date, time, interviewer })
-    setApplicant('')
-    setRole('')
-    setShowModal(false)
-  }
-
-  return (
-    <div>
-      <SectionTitle
-        title="مقابلات المتقدمين"
-        subtitle="تحديد وجدولة المقابلات مع المتقدمين المختصرين."
-        action={
-          <button
-            onClick={() => setShowModal(true)}
-            className="inline-flex items-center gap-2 rounded-xl bg-primary px-3.5 py-2 text-sm font-semibold text-primary-foreground transition-transform hover:scale-[1.03]"
-          >
-            <Plus className="size-4" />
-            جدولة مقابلة
-          </button>
-        }
-      />
-      <div className="space-y-3">
-        {interviews.length === 0 ? (
-          <p className="py-8 text-center text-sm text-muted-foreground">
-            لا توجد مقابلات مجدولة حالياً. اضغط على "جدولة مقابلة" لإضافة موعد جديد.
-          </p>
-        ) : (
-          interviews.map((iv) => (
-            <Panel
-              key={iv.id}
-              className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
-            >
-              <div>
-                <p className="font-medium text-foreground">{iv.applicant}</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  وظيفة: {iv.role} · القائم بالمقابلة: {iv.interviewer}
-                </p>
-              </div>
-              <div className="flex items-center gap-3 text-sm">
-                <StatusBadge status="Interview" />
-                <span className="text-muted-foreground font-sans">
-                  {iv.date} · {iv.time}
-                </span>
-              </div>
-            </Panel>
-          ))
-        )}
-      </div>
-
-      {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md rounded-2xl border border-border bg-background p-6 shadow-2xl space-y-4">
-            <h3 className="font-display text-lg font-bold">جدولة مقابلة جديدة</h3>
-            <form onSubmit={handleSchedule} className="space-y-3">
-              <div>
-                <label className="text-xs font-medium text-muted-foreground">اسم المتقدم</label>
-                <input
-                  required
-                  value={applicant}
-                  onChange={(e) => setApplicant(e.target.value)}
-                  placeholder="مثال: سارة أحمد"
-                  className="mt-1 w-full rounded-xl border border-input bg-secondary/30 px-3 py-2 text-sm outline-none focus:border-primary"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-muted-foreground">الوظيفة المتقدم لها</label>
-                <input
-                  required
-                  value={role}
-                  onChange={(e) => setRole(e.target.value)}
-                  placeholder="مثال: UI/UX Designer"
-                  className="mt-1 w-full rounded-xl border border-input bg-secondary/30 px-3 py-2 text-sm outline-none focus:border-primary"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-medium text-muted-foreground">التاريخ</label>
-                  <input
-                    value={date}
-                    onChange={(e) => setDate(e.target.value)}
-                    className="mt-1 w-full rounded-xl border border-input bg-secondary/30 px-3 py-2 text-sm outline-none focus:border-primary"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-muted-foreground">الوقت</label>
-                  <input
-                    value={time}
-                    onChange={(e) => setTime(e.target.value)}
-                    className="mt-1 w-full rounded-xl border border-input bg-secondary/30 px-3 py-2 text-sm outline-none focus:border-primary"
-                  />
-                </div>
-              </div>
-              <div className="flex justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowModal(false)}
-                  className="rounded-xl border border-border px-4 py-2 text-sm font-medium hover:bg-secondary"
-                >
-                  إلغاء
-                </button>
-                <button
-                  type="submit"
-                  className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
-                >
-                  حفظ التوقيت
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
@@ -604,7 +476,6 @@ export function AssistantWorkspace() {
 
   const tabs: DashboardTab[] = [
     { id: 'pipeline', label: 'Recruitment Pipeline', icon: KanbanSquare, render: () => <Pipeline /> },
-    { id: 'interviews', label: 'Interviews', icon: CalendarClock, render: () => <Interviews /> },
     { id: 'attendance', label: 'Attendance', icon: ClipboardCheck, render: () => <Attendance /> },
     { id: 'announcements', label: 'Announcements', icon: Megaphone, render: () => <AnnouncementsManager /> },
   ]
