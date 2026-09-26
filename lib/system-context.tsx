@@ -177,8 +177,13 @@ export function SystemProvider({ children }: { children: ReactNode }) {
             activeClubId = adminRecord.assigned_team_id
           }
         }
-        if (activeClubId) setCurrentClubId(activeClubId)
       }
+
+      // Fallback: If no specific club is associated with this user session (e.g. Owner or testing), default to primary club
+      if (!activeClubId && dbClubs && dbClubs.length > 0) {
+        activeClubId = dbClubs[0].id
+      }
+      if (activeClubId) setCurrentClubId(activeClubId)
 
       if (activeClubId) {
         // Load Promotion Requests first so we can attach CV / motivation to applicants
@@ -353,6 +358,14 @@ export function SystemProvider({ children }: { children: ReactNode }) {
       }
     }
     loadData()
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+      loadData()
+    })
+
+    return () => {
+      subscription.unsubscribe()
+    }
   }, [])
 
   // Faculty: Add new club

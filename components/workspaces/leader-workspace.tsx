@@ -405,6 +405,15 @@ function useMyClub() {
           faculty: c.faculty || 'الجامعة',
           tagline: c.tagline || '',
         })
+      } else {
+        const { data: firstClub } = await supabase.from('clubs').select('name, faculty, tagline').limit(1).maybeSingle()
+        if (firstClub) {
+          setClub({
+            name: firstClub.name || 'الفريق',
+            faculty: firstClub.faculty || 'الجامعة',
+            tagline: firstClub.tagline || '',
+          })
+        }
       }
     }
     loadMyClub()
@@ -727,6 +736,43 @@ function LeaderTasksManager() {
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [showCompleted, setShowCompleted] = useState(false)
 
+  // Direct fetch fallback in case context members are still loading or empty
+  const [directMembers, setDirectMembers] = useState<typeof members>([])
+
+  useEffect(() => {
+    async function loadDirectMembers() {
+      const supabase = createClient()
+      const { data: mems } = await supabase
+        .from('club_members')
+        .select('id, role, status, created_at, user_id, profiles(full_name, faculty, email, whatsapp, student_id)')
+        .eq('status', 'active')
+
+      if (mems && mems.length > 0) {
+        const mapped: typeof members = mems.map((m: any) => {
+          const profileName = m.profiles?.full_name || 'عضو'
+          const initials = profileName.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)
+          return {
+            id: m.id,
+            userId: m.user_id,
+            name: profileName,
+            initials: initials || 'ST',
+            department: m.profiles?.faculty || 'غير محدد',
+            role: m.role === 'assistant' ? 'Vice Leader' : (m.role === 'leader' ? 'Leader' : 'Member'),
+            joined: 'نشط',
+            attendance: 100,
+            tasksDone: 0,
+            email: m.profiles?.email || '',
+            phone: m.profiles?.whatsapp || '',
+          }
+        })
+        setDirectMembers(mapped)
+      }
+    }
+    loadDirectMembers()
+  }, [])
+
+  const allMembers = members && members.length > 0 ? members : directMembers
+
   // Member selection
   const [assigneeSearch, setAssigneeSearch] = useState('')
   const [selectedAssignee, setSelectedAssignee] = useState<{ id?: string; name: string } | null>(null)
@@ -736,11 +782,11 @@ function LeaderTasksManager() {
   const [submissionType, setSubmissionType] = useState<'none' | 'whatsapp' | 'link'>('none')
   const [submissionValue, setSubmissionValue] = useState('')
 
-  const filteredMembers = members.filter(
+  const filteredMembers = allMembers.filter(
     (m) =>
-      m.name.toLowerCase().includes(assigneeSearch.toLowerCase()) ||
-      m.department.toLowerCase().includes(assigneeSearch.toLowerCase()) ||
-      m.role.toLowerCase().includes(assigneeSearch.toLowerCase())
+      (m.name || '').toLowerCase().includes(assigneeSearch.toLowerCase()) ||
+      (m.department || '').toLowerCase().includes(assigneeSearch.toLowerCase()) ||
+      (m.role || '').toLowerCase().includes(assigneeSearch.toLowerCase())
   )
 
   const pendingTasks = myTasks.filter((t) => t.status !== 'Done')
@@ -1062,7 +1108,9 @@ function LeaderTasksManager() {
                           </button>
                         ))}
                         {filteredMembers.length === 0 && (
-                          <p className="p-2 text-center text-xs text-muted-foreground">لا يوجد عضو بهذا الاسم</p>
+                          <p className="p-3 text-center text-xs text-muted-foreground">
+                            {allMembers.length === 0 ? 'جاري تحميل الأعضاء...' : 'لا يوجد عضو بهذا الاسم'}
+                          </p>
                         )}
                       </div>
                     )}
