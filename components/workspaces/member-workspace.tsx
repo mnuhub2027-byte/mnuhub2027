@@ -48,6 +48,7 @@ type MemberProfile = {
 
 function useMemberProfile(): MemberProfile | null {
   const [profile, setProfile] = useState<MemberProfile | null>(null)
+  const { currentClubId, loadClubData } = useSystem()
 
   useEffect(() => {
     const supabase = createClient()
@@ -61,10 +62,10 @@ function useMemberProfile(): MemberProfile | null {
         .eq('id', user.id)
         .single()
 
-      // Get club membership
+      // Get club membership — fetch club_id too so we can sync context
       const { data: mem } = await supabase
         .from('club_members')
-        .select('role, created_at, clubs(name)')
+        .select('club_id, role, created_at, clubs(name)')
         .eq('user_id', user.id)
         .eq('status', 'active')
         .single()
@@ -89,6 +90,11 @@ function useMemberProfile(): MemberProfile | null {
         userId: user.id,
         email: user.email,
       })
+
+      // Sync club isolation: ensure context loads data for THIS member's club
+      if (mem?.club_id && mem.club_id !== currentClubId) {
+        await loadClubData(mem.club_id)
+      }
     })
   }, [])
 

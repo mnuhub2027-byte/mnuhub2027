@@ -473,7 +473,7 @@ function useCurrentAdminInfo(): AdminInfo | null {
 }
 
 function TasksManager() {
-  const { myTasks, addTask, deleteTask, toggleTaskStatus, members } = useSystem()
+  const { myTasks, addTask, deleteTask, toggleTaskStatus, members, currentClubId } = useSystem()
   const adminInfo = useCurrentAdminInfo()
   const [activeTab, setActiveTab] = useState<'my' | 'manage'>('my')
   const [showModal, setShowModal] = useState(false)
@@ -488,10 +488,28 @@ function TasksManager() {
 
   useEffect(() => {
     async function loadDirectMembers() {
+      // Must filter by club_id to prevent cross-team data leakage
+      let targetClubId = currentClubId
+      if (!targetClubId) {
+        const supabase = createClient()
+        const { data: sessionData } = await supabase.auth.getSession()
+        const user = sessionData?.session?.user
+        if (user) {
+          const { data: mem } = await supabase.from('club_members').select('club_id').eq('user_id', user.id).eq('status', 'active').limit(1).maybeSingle()
+          if (mem?.club_id) targetClubId = mem.club_id
+          else {
+            const { data: adm } = await supabase.from('platform_admins').select('assigned_team_id').eq('email', user.email!).limit(1).maybeSingle()
+            if (adm?.assigned_team_id) targetClubId = adm.assigned_team_id
+          }
+        }
+      }
+      if (!targetClubId) return
+
       const supabase = createClient()
       const { data: mems } = await supabase
         .from('club_members')
         .select('id, role, status, created_at, user_id, profiles(full_name, faculty, email, whatsapp, student_id)')
+        .eq('club_id', targetClubId)
         .eq('status', 'active')
 
       if (mems && mems.length > 0) {
@@ -516,7 +534,7 @@ function TasksManager() {
       }
     }
     loadDirectMembers()
-  }, [])
+  }, [currentClubId])
 
   const allMembers = members && members.length > 0 ? members : directMembers
 

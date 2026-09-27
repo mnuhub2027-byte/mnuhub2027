@@ -37,6 +37,11 @@ export type PromotionRequest = {
 }
 
 type SystemContextType = {
+  // Current active club scoping
+  currentClubId: string | null
+  setCurrentClubId: (id: string | null) => void
+  loadClubData: (clubId: string) => Promise<void>
+
   // Clubs / Teams (Faculty Control)
   clubs: Club[]
   addClub: (newClub: Omit<Club, 'id' | 'members'>) => void
@@ -80,13 +85,14 @@ type SystemContextType = {
 
   // Events & Tasks
   announcements: Announcement[]
-  addAnnouncement: (announcement: Omit<Announcement, 'id' | 'date'>) => void
+  addAnnouncement: (announcement: Omit<Announcement, 'id' | 'date'>, explicitClubId?: string) => Promise<void> | void
   deleteAnnouncement: (announcementId: string) => Promise<void>
   myTasks: Task[]
-  addTask: (task: Omit<Task, 'id'>) => Promise<void>
+  addTask: (task: Omit<Task, 'id'>, explicitClubId?: string) => Promise<void>
   deleteTask: (taskId: string) => Promise<void>
   toggleTaskStatus: (taskId: string) => void
   teamEvents: TeamEvent[]
+  addTeamEvent: (eventData: { title: string; type: string; date: string; time: string; location: string; clubId?: string }) => Promise<void>
   deleteTeamEvent: (eventId: string) => Promise<void>
   interviews: Interview[]
   addInterview: (interview: Omit<Interview, 'id'>) => void
@@ -109,6 +115,227 @@ export function SystemProvider({ children }: { children: ReactNode }) {
   const [currentClubId, setCurrentClubId] = useState<string | null>(null)
 
   const supabase = createClient()
+
+  // Load all data scoped strictly to a specific club
+  const loadClubData = async (targetClubId: string) => {
+    if (!targetClubId) return
+    setCurrentClubId(targetClubId)
+
+    try {
+      // 1. Load Promotion Requests for THIS club
+      const { data: dbProms } = await supabase.from('promotion_requests').select('*').eq('club_id', targetClubId)
+      const cvMap = new Map<string, { cv_link?: string; reason?: string; phone?: string; department?: string }>()
+      if (dbProms) {
+        const actualPromotions = dbProms
+          .filter((p: any) => {
+            const r = (p.reason || '').trim()
+            if (r.startsWith('[طلب_انضمام]')) return false
+            if (r === 'طالب متحمس للانضمام للفريق') return false
+            if (r === 'طلب انضمام للفريق') return false
+            if (r === 'djh') return false
+            return true
+          })
+          .map((p: any) => ({
+            id: p.id,
+            memberName: p.member_name,
+            memberInitials: (p.member_name || 'طالب').substring(0, 2).toUpperCase(),
+            department: p.department || '',
+            requestedRole: 'Vice Leader' as const,
+            submittedAt: new Date(p.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+            status: p.status,
+            reason: (p.reason || '').replace(/^\[ترقية_مساعد\]\s*/, '')
+          }))
+        setPromotionRequests(actualPromotions)
+
+        dbProms.forEach((p: any) => {
+          if (p.user_id) {
+            const cleanReason = (p.reason || '').replace(/^\[طلب_انضمام\]\s*/, '').replace(/^\[ترقية_مساعد\]\s*/, '')
+            cvMap.set(p.user_id, {
+              cv_link: p.cv_link || '',
+              reason: cleanReason,
+              phone: p.phone || '',
+              department: p.department || '',
+            })
+          }
+        })
+      } else {
+        setPromotionRequests([])
+      }
+
+      // 2. Load Members and Applicants for THIS club
+      const { data: dbMembers } = await supabase
+        .from('club_members')
+        .select('id, role, status, created_at, user_id, profiles(full_name, faculty, email, whatsapp, student_id)')
+        .eq('club_id', targetClubId)
+
+      if (dbMembers) {
+        const newMembers: Member[] = []
+        const newApplicants: Applicant[] = []
+
+        dbMembers.forEach((m: any) => {
+          const profileName = m.profiles?.full_name || 'طالب'
+          if (m.status === 'pending') {
+            const submittedAt = m.created_at
+              ? new Date(m.created_at).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' })
+              : 'غير محدد'
+            const userReq = m.user_id ? cvMap.get(m.user_id) : undefined
+            const cvLink = userReq?.cv_link || ''
+            const motivation = userReq?.reason || ''
+
+            newApplicants.push({
+              id: m.id,
+              name: profileName,
+              faculty: m.profiles?.faculty || userReq?.department || 'غير محدد',
+              year: 'N/A',
+              role: m.role || 'member',
+              stage: 'Reviewing',
+              score: 0,
+              portfolio: cvLink,
+              cvLink: cvLink,
+              motivation: motivation,
+              email: m.profiles?.email || '',
+              whatsapp: m.profiles?.whatsapp || userReq?.phone || '',
+              studentId: m.profiles?.student_id || '',
+              submittedAt,
+            })
+          } else if (m.status === 'active') {
+            const initials = profileName.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)
+            const joinedDate = m.created_at
+              ? new Date(m.created_at).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' })
+              : 'غير محدد'
+            newMembers.push({
+              id: m.id,
+              userId: m.user_id,
+              name: profileName,
+              initials: initials,
+              department: m.profiles?.faculty || 'غير محدد',
+              role: m.role === 'assistant' ? 'Vice Leader' : (m.role === 'leader' ? 'Leader' : 'Member'),
+              joined: joinedDate,
+              attendance: 100,
+              tasksDone: 0,
+              email: m.profiles?.email || '',
+              phone: m.profiles?.whatsapp || m.profiles?.student_id || '',
+            })
+          }
+        })
+
+        setMembers(newMembers)
+        setApplicants(newApplicants)
+      } else {
+        setMembers([])
+        setApplicants([])
+      }
+
+      // 3. Load Announcements for THIS club
+      const { data: dbAnns } = await supabase
+        .from('announcements')
+        .select('*')
+        .eq('club_id', targetClubId)
+        .order('created_at', { ascending: false })
+
+      if (dbAnns) {
+        setAnnouncements(dbAnns.map(a => ({
+          id: a.id,
+          title: a.title,
+          body: a.body,
+          author: a.author,
+          pinned: a.pinned,
+          date: new Date(a.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+        })))
+      } else {
+        setAnnouncements([])
+      }
+
+      // 4. Load Interviews for THIS club
+      const { data: dbIvs } = await supabase
+        .from('interviews')
+        .select('*')
+        .eq('club_id', targetClubId)
+
+      if (dbIvs) {
+        setInterviews(dbIvs.map(i => ({
+          id: i.id,
+          applicant: i.applicant_name,
+          role: i.role,
+          date: i.date,
+          time: i.time,
+          interviewer: i.interviewer
+        })))
+      } else {
+        setInterviews([])
+      }
+
+      // 5. Load Tasks for THIS club
+      const { data: dbTasks } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('club_id', targetClubId)
+
+      if (dbTasks) {
+        setMyTasks(dbTasks.map(t => {
+          let cleanTitle = t.title || ''
+          let assigneeName: string | undefined = undefined
+          let submissionType: 'whatsapp' | 'link' | 'none' | undefined = undefined
+          let submissionValue: string | undefined = undefined
+
+          const assigneeMatch = cleanTitle.match(/\[المكلف:\s*([^\]]+)\]/)
+          if (assigneeMatch) {
+            assigneeName = assigneeMatch[1].trim()
+            cleanTitle = cleanTitle.replace(assigneeMatch[0], '')
+          }
+
+          const whatsappMatch = cleanTitle.match(/\[تسليم_واتساب:\s*([^\]]+)\]/)
+          if (whatsappMatch) {
+            submissionType = 'whatsapp'
+            submissionValue = whatsappMatch[1].trim()
+            cleanTitle = cleanTitle.replace(whatsappMatch[0], '')
+          }
+
+          const linkMatch = cleanTitle.match(/\[تسليم_رابط:\s*([^\]]+)\]/)
+          if (linkMatch) {
+            submissionType = 'link'
+            submissionValue = linkMatch[1].trim()
+            cleanTitle = cleanTitle.replace(linkMatch[0], '')
+          }
+
+          return {
+            id: t.id,
+            title: cleanTitle.trim(),
+            assigneeName,
+            submissionType,
+            submissionValue,
+            due: t.due_date || '',
+            priority: t.priority || 'Medium',
+            status: t.status
+          }
+        }))
+      } else {
+        setMyTasks([])
+      }
+
+      // 6. Load Events for THIS club
+      const { data: dbEvents } = await supabase
+        .from('team_events')
+        .select('*')
+        .eq('club_id', targetClubId)
+
+      if (dbEvents) {
+        setTeamEvents(dbEvents.map(e => ({
+          id: e.id,
+          title: e.title,
+          type: e.type || 'Event',
+          day: new Date(e.date).toLocaleDateString('en-US', { weekday: 'short' }),
+          date: e.date,
+          time: e.time,
+          location: e.location || 'TBA'
+        })))
+      } else {
+        setTeamEvents([])
+      }
+    } catch (err) {
+      console.error('Error loading club data:', err)
+    }
+  }
 
   // Initial Data Fetching from Supabase
   useEffect(() => {
@@ -183,191 +410,9 @@ export function SystemProvider({ children }: { children: ReactNode }) {
       if (!activeClubId && dbClubs && dbClubs.length > 0) {
         activeClubId = dbClubs[0].id
       }
-      if (activeClubId) setCurrentClubId(activeClubId)
 
       if (activeClubId) {
-        // Load Promotion Requests first so we can attach CV / motivation to applicants
-        const { data: dbProms } = await supabase.from('promotion_requests').select('*').eq('club_id', activeClubId)
-        const cvMap = new Map<string, { cv_link?: string; reason?: string; phone?: string; department?: string }>()
-        if (dbProms) {
-           // Only actual promotion requests requested by members themselves
-           const actualPromotions = dbProms
-             .filter((p: any) => {
-               const r = (p.reason || '').trim()
-               if (r.startsWith('[طلب_انضمام]')) return false
-               // Filter out automatic application reasons from seed/test applications
-               if (r === 'طالب متحمس للانضمام للفريق') return false
-               if (r === 'طلب انضمام للفريق') return false
-               if (r === 'djh') return false
-               return true
-             })
-             .map((p: any) => ({
-                id: p.id,
-                memberName: p.member_name,
-                memberInitials: (p.member_name || 'طالب').substring(0, 2).toUpperCase(),
-                department: p.department || '',
-                requestedRole: 'Vice Leader' as const,
-                submittedAt: new Date(p.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-                status: p.status,
-                reason: (p.reason || '').replace(/^\[ترقية_مساعد\]\s*/, '')
-             }))
-           setPromotionRequests(actualPromotions)
-
-           dbProms.forEach((p: any) => {
-             if (p.user_id) {
-               const cleanReason = (p.reason || '').replace(/^\[طلب_انضمام\]\s*/, '').replace(/^\[ترقية_مساعد\]\s*/, '')
-               cvMap.set(p.user_id, {
-                 cv_link: p.cv_link || '',
-                 reason: cleanReason,
-                 phone: p.phone || '',
-                 department: p.department || '',
-               })
-             }
-           })
-        }
-
-        // Load Members and Applicants for THIS club
-        const { data: dbMembers } = await supabase
-          .from('club_members')
-          .select('id, role, status, created_at, user_id, profiles(full_name, faculty, email, whatsapp, student_id)')
-          .eq('club_id', activeClubId)
-        
-        if (dbMembers) {
-          const newMembers: Member[] = []
-          const newApplicants: Applicant[] = []
-          
-          dbMembers.forEach((m: any) => {
-            const profileName = m.profiles?.full_name || 'طالب'
-            if (m.status === 'pending') {
-              const submittedAt = m.created_at
-                ? new Date(m.created_at).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' })
-                : 'غير محدد'
-              const userReq = m.user_id ? cvMap.get(m.user_id) : undefined
-              const cvLink = userReq?.cv_link || ''
-              const motivation = userReq?.reason || ''
-
-              newApplicants.push({
-                id: m.id,
-                name: profileName,
-                faculty: m.profiles?.faculty || userReq?.department || 'غير محدد',
-                year: 'N/A',
-                role: m.role || 'member',
-                stage: 'Reviewing',
-                score: 0,
-                portfolio: cvLink,
-                cvLink: cvLink,
-                motivation: motivation,
-                email: m.profiles?.email || '',
-                whatsapp: m.profiles?.whatsapp || userReq?.phone || '',
-                studentId: m.profiles?.student_id || '',
-                submittedAt,
-              })
-            } else if (m.status === 'active') {
-              const initials = profileName.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)
-              const joinedDate = m.created_at
-                ? new Date(m.created_at).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' })
-                : 'غير محدد'
-              newMembers.push({
-                id: m.id,
-                userId: m.user_id,
-                name: profileName,
-                initials: initials,
-                department: m.profiles?.faculty || 'غير محدد',
-                role: m.role === 'assistant' ? 'Vice Leader' : (m.role === 'leader' ? 'Leader' : 'Member'),
-                joined: joinedDate,
-                attendance: 100,
-                tasksDone: 0,
-                email: m.profiles?.email || '',
-                phone: m.profiles?.whatsapp || m.profiles?.student_id || '',
-              })
-            }
-          })
-          
-          setMembers(newMembers)
-          setApplicants(newApplicants)
-        }
-
-        // Load Announcements
-        const { data: dbAnns } = await supabase.from('announcements').select('*').eq('club_id', activeClubId).order('created_at', { ascending: false })
-        if (dbAnns) {
-           setAnnouncements(dbAnns.map(a => ({
-              id: a.id,
-              title: a.title,
-              body: a.body,
-              author: a.author,
-              pinned: a.pinned,
-              date: new Date(a.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-           })))
-        }
-
-        // Load Interviews
-        const { data: dbIvs } = await supabase.from('interviews').select('*').eq('club_id', activeClubId)
-        if (dbIvs) {
-           setInterviews(dbIvs.map(i => ({
-              id: i.id,
-              applicant: i.applicant_name,
-              role: i.role,
-              date: i.date,
-              time: i.time,
-              interviewer: i.interviewer
-           })))
-        }
-
-        // Load Tasks
-        const { data: dbTasks } = await supabase.from('tasks').select('*').eq('club_id', activeClubId)
-        if (dbTasks) {
-           setMyTasks(dbTasks.map(t => {
-             let cleanTitle = t.title || ''
-             let assigneeName: string | undefined = undefined
-             let submissionType: 'whatsapp' | 'link' | 'none' | undefined = undefined
-             let submissionValue: string | undefined = undefined
-
-             const assigneeMatch = cleanTitle.match(/\[المكلف:\s*([^\]]+)\]/)
-             if (assigneeMatch) {
-               assigneeName = assigneeMatch[1].trim()
-               cleanTitle = cleanTitle.replace(assigneeMatch[0], '')
-             }
-
-             const whatsappMatch = cleanTitle.match(/\[تسليم_واتساب:\s*([^\]]+)\]/)
-             if (whatsappMatch) {
-               submissionType = 'whatsapp'
-               submissionValue = whatsappMatch[1].trim()
-               cleanTitle = cleanTitle.replace(whatsappMatch[0], '')
-             }
-
-             const linkMatch = cleanTitle.match(/\[تسليم_رابط:\s*([^\]]+)\]/)
-             if (linkMatch) {
-               submissionType = 'link'
-               submissionValue = linkMatch[1].trim()
-               cleanTitle = cleanTitle.replace(linkMatch[0], '')
-             }
-
-             return {
-               id: t.id,
-               title: cleanTitle.trim(),
-               assigneeName,
-               submissionType,
-               submissionValue,
-               due: t.due_date || '',
-               priority: t.priority || 'Medium',
-               status: t.status
-             }
-           }))
-        }
-
-        // Load Events
-        const { data: dbEvents } = await supabase.from('team_events').select('*').eq('club_id', activeClubId)
-        if (dbEvents) {
-           setTeamEvents(dbEvents.map(e => ({
-              id: e.id,
-              title: e.title,
-              type: e.type || 'Event',
-              day: new Date(e.date).toLocaleDateString('en-US', { weekday: 'short' }),
-              date: e.date,
-              time: e.time,
-              location: e.location || 'TBA'
-           })))
-        }
+        await loadClubData(activeClubId)
       }
     }
     loadData()
@@ -930,6 +975,58 @@ export function SystemProvider({ children }: { children: ReactNode }) {
     toast.success('Interview scheduled for ' + interviewData.applicant)
   }
 
+  // Add Team Event
+  const addTeamEvent = async (eventData: { title: string; type: string; date: string; time: string; location: string; clubId?: string }) => {
+    let clubId = eventData.clubId || currentClubId
+    if (!clubId) {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { toast.error('يجب تسجيل الدخول أولاً'); return }
+      const { data: membership } = await supabase.from('club_members').select('club_id').eq('user_id', user.id).eq('status', 'active').limit(1).maybeSingle()
+      if (membership) {
+        clubId = membership.club_id
+        setCurrentClubId(clubId)
+      } else {
+        const { data: adminRec } = await supabase.from('platform_admins').select('assigned_team_id').eq('email', user.email!).limit(1).maybeSingle()
+        if (adminRec?.assigned_team_id) {
+          clubId = adminRec.assigned_team_id
+          setCurrentClubId(clubId)
+        }
+      }
+    }
+    if (!clubId) {
+      toast.error('لم يتم تحديد الفريق')
+      return
+    }
+
+    const { data, error } = await supabase.from('team_events').insert({
+      club_id: clubId,
+      title: eventData.title,
+      type: eventData.type,
+      date: eventData.date,
+      time: eventData.time,
+      location: eventData.location || 'يحدد لاحقاً',
+    }).select().single()
+
+    if (error) {
+      toast.error('حدث خطأ أثناء حفظ الحدث: ' + error.message)
+      return
+    }
+
+    setTeamEvents((prev) => [
+      ...prev,
+      {
+        id: data.id,
+        title: data.title,
+        type: data.type || 'Event',
+        day: new Date(data.date).toLocaleDateString('en-US', { weekday: 'short' }),
+        date: data.date,
+        time: data.time,
+        location: data.location || 'TBA',
+      },
+    ])
+    toast.success('تم نشر الحدث بنجاح ويظهر الآن في المنصة والأخبار! 🎯')
+  }
+
   // Delete Team Event
   const deleteTeamEvent = async (eventId: string) => {
     const { error } = await supabase.from('team_events').delete().eq('id', eventId)
@@ -944,6 +1041,9 @@ export function SystemProvider({ children }: { children: ReactNode }) {
   return (
     <SystemContext.Provider
       value={{
+        currentClubId,
+        setCurrentClubId,
+        loadClubData,
         clubs,
         addClub,
         deleteClub,
@@ -971,6 +1071,7 @@ export function SystemProvider({ children }: { children: ReactNode }) {
         deleteTask,
         toggleTaskStatus,
         teamEvents,
+        addTeamEvent,
         deleteTeamEvent,
         interviews,
         addInterview,

@@ -486,7 +486,7 @@ const EVENT_TYPES = [
 ]
 
 function EventsManager() {
-  const { teamEvents, deleteTeamEvent } = useSystem()
+  const { teamEvents, addTeamEvent, deleteTeamEvent } = useSystem()
   const [showModal, setShowModal] = useState(false)
   const [title, setTitle] = useState('')
   const [type, setType] = useState('workshop')
@@ -512,61 +512,9 @@ function EventsManager() {
     setSaving(true)
 
     try {
-      const { createClient } = await import('@/lib/supabase/client')
-      const supabase = createClient()
-      const { data: sessionData } = await supabase.auth.getSession()
-      const user = sessionData?.session?.user
-
-      let clubId: string | null = null
-
-      if (user) {
-        const { data: membership } = await supabase
-          .from('club_members')
-          .select('club_id')
-          .eq('user_id', user.id)
-          .eq('status', 'active')
-          .limit(1)
-          .maybeSingle()
-
-        if (membership?.club_id) {
-          clubId = membership.club_id
-        } else {
-          const { data: adminRecord } = await supabase
-            .from('platform_admins')
-            .select('assigned_team_id')
-            .eq('email', user.email)
-            .limit(1)
-            .maybeSingle()
-
-          if (adminRecord?.assigned_team_id) {
-            clubId = adminRecord.assigned_team_id
-          }
-        }
-      }
-
-      if (!clubId) {
-        toast.error('لم يتم العثور على التيم الخاص بك.')
-        return
-      }
-
-      const { error: insertErr } = await supabase.from('team_events').insert({
-        club_id: clubId,
-        title,
-        type,
-        date,
-        time,
-        location: location || 'يحدد لاحقاً',
-      })
-
-      if (insertErr) {
-        toast.error('حدث خطأ أثناء حفظ الحدث: ' + insertErr.message)
-        return
-      }
-
-      toast.success('تم نشر الحدث بنجاح ويظهر الآن في المنصة والأخبار! 🎯')
+      await addTeamEvent({ title, type, date, time, location: location || 'يحدد لاحقاً' })
       setTitle(''); setType('workshop'); setDate(''); setTime(''); setLocation('')
       setShowModal(false)
-      window.location.reload()
     } finally {
       setSaving(false)
     }
@@ -727,7 +675,7 @@ function EventsManager() {
 
 
 function LeaderTasksManager() {
-  const { myTasks, addTask, deleteTask, toggleTaskStatus, members } = useSystem()
+  const { myTasks, addTask, deleteTask, toggleTaskStatus, members, currentClubId } = useSystem()
   const [showModal, setShowModal] = useState(false)
   const [title, setTitle] = useState('')
   const [due, setDue] = useState('')
@@ -741,10 +689,28 @@ function LeaderTasksManager() {
 
   useEffect(() => {
     async function loadDirectMembers() {
+      // Must filter by club_id to prevent cross-team data leakage
+      let targetClubId = currentClubId
+      if (!targetClubId) {
+        const supabase = createClient()
+        const { data: sessionData } = await supabase.auth.getSession()
+        const user = sessionData?.session?.user
+        if (user) {
+          const { data: mem } = await supabase.from('club_members').select('club_id').eq('user_id', user.id).eq('status', 'active').limit(1).maybeSingle()
+          if (mem?.club_id) targetClubId = mem.club_id
+          else {
+            const { data: adm } = await supabase.from('platform_admins').select('assigned_team_id').eq('email', user.email!).limit(1).maybeSingle()
+            if (adm?.assigned_team_id) targetClubId = adm.assigned_team_id
+          }
+        }
+      }
+      if (!targetClubId) return
+
       const supabase = createClient()
       const { data: mems } = await supabase
         .from('club_members')
         .select('id, role, status, created_at, user_id, profiles(full_name, faculty, email, whatsapp, student_id)')
+        .eq('club_id', targetClubId)
         .eq('status', 'active')
 
       if (mems && mems.length > 0) {
@@ -769,7 +735,7 @@ function LeaderTasksManager() {
       }
     }
     loadDirectMembers()
-  }, [])
+  }, [currentClubId])
 
   const allMembers = members && members.length > 0 ? members : directMembers
 
