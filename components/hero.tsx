@@ -9,10 +9,10 @@ import { createClient } from '@/lib/supabase/client'
 type HeroProps = {
   query: string
   onQuery: (v: string) => void
-  faculty: string
-  onFaculty: (v: string) => void
-  category: Category | 'All'
-  onCategory: (v: Category | 'All') => void
+  faculty?: string
+  onFaculty?: (v: string) => void
+  category?: Category | 'All'
+  onCategory?: (v: Category | 'All') => void
   onExplore: () => void
 }
 
@@ -48,10 +48,6 @@ function useHeroStats() {
 export function Hero({
   query,
   onQuery,
-  faculty,
-  onFaculty,
-  category,
-  onCategory,
   onExplore,
 }: HeroProps) {
   const stats = useHeroStats()
@@ -95,46 +91,25 @@ export function Hero({
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.15 }}
-          className="mx-auto mt-8 max-w-3xl rounded-2xl border border-border glass p-3 glow-ring"
+          className="mx-auto mt-8 max-w-2xl rounded-2xl border border-border glass p-2 glow-ring"
         >
-          <div className="flex flex-col gap-2 md:flex-row md:gap-3">
-            <div className="flex flex-1 items-center gap-2 rounded-xl bg-background/60 px-3">
-              <Search className="size-4 shrink-0 text-muted-foreground" />
-              <input
-                value={query}
-                onChange={(e) => onQuery(e.target.value)}
-                placeholder="Search clubs…"
-                className="h-11 w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-2 md:flex md:gap-3">
-              <select
-                value={faculty}
-                onChange={(e) => onFaculty(e.target.value)}
-                className="h-11 w-full rounded-xl bg-background/60 px-3 text-sm text-foreground outline-none ring-offset-background focus:ring-2 focus:ring-ring"
+          <div className="flex items-center gap-3 rounded-xl bg-background/60 px-4">
+            <Search className="size-5 shrink-0 text-muted-foreground" />
+            <input
+              value={query}
+              onChange={(e) => onQuery(e.target.value)}
+              placeholder="ابحث باسم الفريق... / Search by team name..."
+              className="h-12 w-full bg-transparent text-sm sm:text-base outline-none placeholder:text-muted-foreground"
+            />
+            {query && (
+              <button
+                type="button"
+                onClick={() => onQuery('')}
+                className="text-xs text-muted-foreground hover:text-foreground p-1 shrink-0"
               >
-                <option value="All">All Faculties</option>
-                {faculties.map((f) => (
-                  <option key={f} value={f}>
-                    {f}
-                  </option>
-                ))}
-              </select>
-
-              <select
-                value={category}
-                onChange={(e) => onCategory(e.target.value as Category | 'All')}
-                className="h-11 w-full rounded-xl bg-background/60 px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring"
-              >
-                <option value="All">All Categories</option>
-                {categories.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-            </div>
+                مسح
+              </button>
+            )}
           </div>
         </motion.div>
 

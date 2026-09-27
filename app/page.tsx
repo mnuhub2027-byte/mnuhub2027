@@ -16,23 +16,18 @@ import { useSystem } from '@/lib/system-context'
 export default function Page() {
   const { clubs } = useSystem()
   const [query, setQuery] = useState('')
-  const [faculty, setFaculty] = useState('All')
   const [category, setCategory] = useState<Category | 'All'>('All')
   const [selected, setSelected] = useState<Club | null>(null)
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
     return clubs.filter((c) => {
-      const matchesQuery =
-        !q ||
-        c.name.toLowerCase().includes(q) ||
-        c.description.toLowerCase().includes(q) ||
-        c.category.toLowerCase().includes(q)
-      const matchesFaculty = faculty === 'All' || c.faculty === faculty
+      // البحث باسم التيم فقط
+      const matchesQuery = !q || c.name.toLowerCase().includes(q)
       const matchesCategory = category === 'All' || c.category === category
-      return matchesQuery && matchesFaculty && matchesCategory
+      return matchesQuery && matchesCategory
     })
-  }, [clubs, query, faculty, category])
+  }, [clubs, query, category])
 
   const scrollToDirectory = () => {
     document.getElementById('directory')?.scrollIntoView({ behavior: 'smooth' })
@@ -45,10 +40,6 @@ export default function Page() {
       <Hero
         query={query}
         onQuery={setQuery}
-        faculty={faculty}
-        onFaculty={setFaculty}
-        category={category}
-        onCategory={setCategory}
         onExplore={scrollToDirectory}
       />
 
