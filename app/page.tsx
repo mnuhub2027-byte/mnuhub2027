@@ -23,8 +23,9 @@ export default function Page() {
     const q = query.trim().toLowerCase()
     return clubs.filter((c) => {
       // البحث باسم التيم فقط
-      const matchesQuery = !q || c.name.toLowerCase().includes(q)
-      const matchesCategory = category === 'All' || c.category === category
+      const matchesQuery = !q || (c.name || '').toLowerCase().includes(q)
+      // إذا كان المستخدم يبحث بالاسم، لا تقيد النتيجة بالفئة
+      const matchesCategory = q ? true : (category === 'All' || c.category === category)
       return matchesQuery && matchesCategory
     })
   }, [clubs, query, category])
@@ -40,6 +41,8 @@ export default function Page() {
       <Hero
         query={query}
         onQuery={setQuery}
+        clubs={clubs}
+        onSelectClub={setSelected}
         onExplore={scrollToDirectory}
       />
 

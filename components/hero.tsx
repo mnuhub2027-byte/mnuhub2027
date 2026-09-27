@@ -2,7 +2,7 @@
 
 import { motion } from 'framer-motion'
 import { ArrowRight, Search, Sparkles } from 'lucide-react'
-import { categories, faculties, type Category } from '@/lib/data'
+import { categories, faculties, type Category, type Club } from '@/lib/data'
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
@@ -13,6 +13,8 @@ type HeroProps = {
   onFaculty?: (v: string) => void
   category?: Category | 'All'
   onCategory?: (v: Category | 'All') => void
+  clubs?: Club[]
+  onSelectClub?: (club: Club) => void
   onExplore: () => void
 }
 
@@ -48,9 +50,42 @@ function useHeroStats() {
 export function Hero({
   query,
   onQuery,
+  clubs = [],
+  onSelectClub,
   onExplore,
 }: HeroProps) {
   const stats = useHeroStats()
+
+  // Fallback to fetch clubs directly if not provided
+  const [dbClubs, setDbClubs] = useState<Club[]>([])
+  useEffect(() => {
+    if (!clubs || clubs.length === 0) {
+      const supabase = createClient()
+      supabase.from('clubs').select('*').then(({ data }) => {
+        if (data && data.length > 0) {
+          setDbClubs(data.map((c: any) => ({
+            id: c.id,
+            name: c.name,
+            category: c.category || 'Tech',
+            faculty: c.faculty || 'General',
+            tagline: c.tagline || '',
+            description: c.description || '',
+            image: '/clubs/robotics.png',
+            members: 1,
+            achievements: [],
+            events: [],
+            openRoles: ['Member'],
+          })))
+        }
+      })
+    }
+  }, [clubs])
+
+  const allClubs = clubs && clubs.length > 0 ? clubs : dbClubs
+  const q = query.trim().toLowerCase()
+  const matchingClubs = allClubs.filter(
+    (c) => q && (c.name || '').toLowerCase().includes(q)
+  )
 
   return (
     <section id="hero" className="relative overflow-hidden">
@@ -91,26 +126,92 @@ export function Hero({
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.15 }}
-          className="mx-auto mt-8 max-w-2xl rounded-2xl border border-border glass p-2 glow-ring"
+          className="relative mx-auto mt-8 max-w-2xl"
         >
-          <div className="flex items-center gap-3 rounded-xl bg-background/60 px-4">
-            <Search className="size-5 shrink-0 text-muted-foreground" />
-            <input
-              value={query}
-              onChange={(e) => onQuery(e.target.value)}
-              placeholder="ابحث باسم الفريق... / Search by team name..."
-              className="h-12 w-full bg-transparent text-sm sm:text-base outline-none placeholder:text-muted-foreground"
-            />
-            {query && (
-              <button
-                type="button"
-                onClick={() => onQuery('')}
-                className="text-xs text-muted-foreground hover:text-foreground p-1 shrink-0"
-              >
-                مسح
-              </button>
-            )}
+          <div className="rounded-2xl border border-border glass p-2 glow-ring">
+            <div className="flex items-center gap-3 rounded-xl bg-background/60 px-4">
+              <Search className="size-5 shrink-0 text-primary" />
+              <input
+                value={query}
+                onChange={(e) => onQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    onExplore()
+                  }
+                }}
+                placeholder="ابحث باسم الفريق... / Search by team name..."
+                className="h-12 w-full bg-transparent text-sm sm:text-base outline-none placeholder:text-muted-foreground"
+              />
+              {query && (
+                <button
+                  type="button"
+                  onClick={() => onQuery('')}
+                  className="rounded-lg bg-secondary/60 px-2 py-1 text-xs text-muted-foreground hover:text-foreground transition-colors shrink-0"
+                >
+                  مسح
+                </button>
+              )}
+            </div>
           </div>
+
+          {/* Live Search Results Dropdown */}
+          {q.length > 0 && (
+            <div className="absolute left-0 right-0 top-full z-50 mt-2 max-h-80 overflow-y-auto rounded-2xl border border-border bg-card/95 backdrop-blur-md p-2 shadow-2xl space-y-1">
+              {matchingClubs.length > 0 ? (
+                <>
+                  <div className="px-3 py-1.5 text-[11px] font-semibold text-muted-foreground flex items-center justify-between border-b border-border/40 pb-2">
+                    <span>نتائج البحث عن "{query}" ({matchingClubs.length})</span>
+                    <button
+                      type="button"
+                      onClick={onExplore}
+                      className="text-primary hover:underline flex items-center gap-1 text-[11px]"
+                    >
+                      عرض في الدليل بالأسفل ↓
+                    </button>
+                  </div>
+                  {matchingClubs.map((club) => (
+                    <button
+                      key={club.id}
+                      type="button"
+                      onClick={() => {
+                        if (onSelectClub) {
+                          onSelectClub(club)
+                        } else {
+                          onExplore()
+                        }
+                      }}
+                      className="flex w-full items-center justify-between rounded-xl p-3 text-right transition-colors hover:bg-secondary/70 group"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/15 font-bold text-primary text-sm group-hover:scale-105 transition-transform">
+                          {(club.name || 'CL').slice(0, 2).toUpperCase()}
+                        </div>
+                        <div className="text-right min-w-0">
+                          <p className="font-bold text-sm text-foreground group-hover:text-primary transition-colors truncate">
+                            {club.name}
+                          </p>
+                          <p className="text-xs text-muted-foreground line-clamp-1">
+                            {club.tagline || club.description || club.faculty}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0 mr-2">
+                        <span className="rounded-lg bg-secondary px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                          {club.faculty || club.category}
+                        </span>
+                        <ArrowRight className="size-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all" />
+                      </div>
+                    </button>
+                  ))}
+                </>
+              ) : (
+                <div className="py-6 text-center">
+                  <p className="text-sm font-semibold text-foreground">لا توجد أفرقة مطابقة لـ "{query}"</p>
+                  <p className="mt-1 text-xs text-muted-foreground">تأكد من كتابة اسم الفريق بشكل صحيح.</p>
+                </div>
+              )}
+            </div>
+          )}
         </motion.div>
 
         <motion.div
