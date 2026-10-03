@@ -17,7 +17,7 @@ export type RoleMeta = {
   id: Role
   label: string
   arabic: string
-  blurb: string
+  blurb: { ar: string; en: string }
   icon: LucideIcon
   /** tailwind text color token used for accents */
   accent: string
@@ -29,7 +29,10 @@ export const roleMeta: Record<Role, RoleMeta> = {
     id: 'applicant',
     label: 'Applicant',
     arabic: 'طالب جديد',
-    blurb: 'Browse clubs, apply, and track your applications.',
+    blurb: {
+      ar: 'استعراض أندية جامعة المنصورة الأهلية، التقديم على الفرق الطلابية، ومتابعة حالة الطلبات مباشرة.',
+      en: 'Browse Mansoura National University clubs, apply, and track your applications directly.',
+    },
     icon: GraduationCap,
     accent: 'text-accent',
     dot: 'bg-accent',
@@ -38,7 +41,10 @@ export const roleMeta: Record<Role, RoleMeta> = {
     id: 'member',
     label: 'Member',
     arabic: 'عضو في التيم',
-    blurb: 'Announcements, tasks, events, and your team directory.',
+    blurb: {
+      ar: 'متابعة إعلانات الفريق، التنفيذ والتسليم التفاعلي للمهام، ومطالعة دليل أفراد الفريق.',
+      en: 'Track team announcements, execute and submit assigned tasks, and explore team members.',
+    },
     icon: Users,
     accent: 'text-chart-3',
     dot: 'bg-chart-3',
@@ -47,7 +53,10 @@ export const roleMeta: Record<Role, RoleMeta> = {
     id: 'assistant',
     label: 'Admin',
     arabic: 'أدمن الفريق',
-    blurb: 'Team admins have elevated privileges to assist leaders in managing operations and members.',
+    blurb: {
+      ar: 'إدارة طلبات الانضمام، تقييم السير الذاتية والمقابلات، ومساعدة قائد الفريق في تنظيم العمليات.',
+      en: 'Manage application pipelines, review applicant portfolios, and assist team leaders in operations.',
+    },
     icon: ShieldCheck,
     accent: 'text-primary',
     dot: 'bg-chart-4',
@@ -56,7 +65,10 @@ export const roleMeta: Record<Role, RoleMeta> = {
     id: 'leader',
     label: 'Team Leader',
     arabic: 'قائد التيم',
-    blurb: 'Executive dashboard: analytics, approvals, and members.',
+    blurb: {
+      ar: 'التحكم التنفيذي للفريق: متابعة الإحصائيات، اعتماد أفراد التيم والترقيات، وتوزيع المهام.',
+      en: 'Executive team controls: analytics dashboard, member approvals, promotions, and task assignments.',
+    },
     icon: Crown,
     accent: 'text-primary',
     dot: 'bg-primary',
@@ -64,8 +76,11 @@ export const roleMeta: Record<Role, RoleMeta> = {
   owner: {
     id: 'owner',
     label: 'Platform Owner',
-    arabic: 'إدارة الجامعة',
-    blurb: 'Master control dashboard for platform-wide analytics and club creation.',
+    arabic: 'رئيس المنصة وإدارة الجامعة',
+    blurb: {
+      ar: 'لوحة التحكم الشاملة للأنشطة الطلابية: إدارة جميع كليات وأندية جامعة المنصورة الأهلية الـ 10، تعيين مسؤولي الكليات، وتتبع الإحصائيات العامة.',
+      en: 'Master control dashboard: manage all 10 faculties of Mansoura National University, assign admins, and oversee platform analytics.',
+    },
     icon: Building2,
     accent: 'text-gold',
     dot: 'bg-gold',

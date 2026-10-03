@@ -15,8 +15,11 @@ import {
   Sparkles,
   CheckCircle2,
   X,
+  Megaphone,
 } from 'lucide-react'
+import { toast } from 'sonner'
 import { useSystem } from '@/lib/system-context'
+import { useLanguage } from '@/lib/i18n/LanguageContext'
 import { faculties, categories, type Category } from '@/lib/data'
 import {
   DashboardShell,
@@ -27,21 +30,25 @@ import {
 } from '@/components/dashboard-shell'
 
 function Overview() {
-  const { clubs, admins, studentApplications, members } = useSystem()
+  const { clubs, admins, studentApplications, members, sendNotification } = useSystem()
+  const { language } = useLanguage()
+  const isAr = language === 'ar'
+
   const [activeMembersCount, setActiveMembersCount] = useState<number | null>(null)
   const [totalApplicationsCount, setTotalApplicationsCount] = useState<number | null>(null)
+  const [showBroadcast, setShowBroadcast] = useState(false)
+  const [broadcastTitle, setBroadcastTitle] = useState('')
+  const [broadcastBody, setBroadcastBody] = useState('')
 
   useEffect(() => {
     const supabase = createClient()
 
-    // Real active members count across all clubs
     supabase
       .from('club_members')
       .select('id', { count: 'exact', head: true })
       .eq('status', 'active')
       .then(({ count }) => { if (count !== null) setActiveMembersCount(count) })
 
-    // Real total applications count across all clubs
     supabase
       .from('club_members')
       .select('id', { count: 'exact', head: true })
@@ -49,18 +56,37 @@ function Overview() {
       .then(({ count }) => { if (count !== null) setTotalApplicationsCount(count) })
   }, [])
 
+  const handleBroadcast = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!broadcastTitle || !broadcastBody) return
+    sendNotification(broadcastTitle, broadcastBody, 'system')
+    toast.success(isAr ? 'تم بث التنبيه العام لكافة طلاب كليات جامعة المنصورة الأهلية بنجاح!' : 'Global campus announcement broadcast successfully!')
+    setBroadcastTitle('')
+    setBroadcastBody('')
+    setShowBroadcast(false)
+  }
+
   const stats = [
-    { label: 'إجمالي الفرق والأنشطة', value: clubs.length, icon: Building2, accent: 'text-gold' },
-    { label: 'حسابات الأدمن المعتمدة', value: admins.length, icon: ShieldCheck, accent: 'text-primary' },
-    { label: 'أعضاء الكلية النشطون', value: activeMembersCount ?? members.length, icon: Users, accent: 'text-chart-3' },
-    { label: 'طلبات الانضمام الكلية', value: totalApplicationsCount ?? studentApplications.length, icon: LayoutGrid, accent: 'text-chart-4' },
+    { label: isAr ? 'إجمالي الفرق والأنشطة' : 'Total Teams & Clubs', value: clubs.length, icon: Building2, accent: 'text-gold' },
+    { label: isAr ? 'حسابات الأدمن المعتمدة' : 'Approved Leaders', value: admins.length, icon: ShieldCheck, accent: 'text-primary' },
+    { label: isAr ? 'أعضاء الكلية النشطون' : 'Active Students', value: activeMembersCount ?? members.length, icon: Users, accent: 'text-chart-3' },
+    { label: isAr ? 'طلبات الانضمام الكلية' : 'Total Applications', value: totalApplicationsCount ?? studentApplications.length, icon: LayoutGrid, accent: 'text-chart-4' },
   ]
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 text-start rtl:text-right">
       <SectionTitle
-        title="لوحة تحكم الكلية والمنصة"
-        subtitle="إدارة المنظومة بالكامل، إضافة الفرق، وتعيين الليدرز لكل نشاط."
+        title={isAr ? 'لوحة تحكم الكلية والمنصة' : 'University & Platform Master Dashboard'}
+        subtitle={isAr ? 'إدارة المنظومة بالكامل، إضافة الفرق، وتعيين الليدرز لكل نشاط.' : 'Manage the entire ecosystem, add teams, and assign team leaders.'}
+        action={
+          <button
+            onClick={() => setShowBroadcast(true)}
+            className="inline-flex items-center gap-2 rounded-xl bg-gold px-3.5 py-2 text-xs font-bold text-slate-950 shadow-md hover:bg-gold/90 transition-colors"
+          >
+            <Megaphone className="size-4" />
+            {isAr ? 'بث إعلان عام لطلاب الجامعة' : 'Campus Broadcast'}
+          </button>
+        }
       />
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {stats.map((s) => (
@@ -68,12 +94,77 @@ function Overview() {
         ))}
       </div>
 
+      {/* Broadcast Modal */}
+      <AnimatePresence>
+        {showBroadcast && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 text-start rtl:text-right">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="w-full max-w-md rounded-2xl border border-border bg-background p-6 shadow-2xl space-y-5"
+            >
+              <div className="flex items-center justify-between">
+                <h3 className="font-display text-lg font-bold flex items-center gap-2">
+                  <Megaphone className="size-5 text-gold animate-pulse" />
+                  {isAr ? 'بث تنبيه عاجل لطلاب الجامعة' : 'Send Global Campus Push'}
+                </h3>
+                <button onClick={() => setShowBroadcast(false)} className="text-muted-foreground hover:text-foreground">
+                  <X className="size-5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleBroadcast} className="space-y-4">
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">{isAr ? 'عنوان التنبيه العام' : 'Notification Title'}</label>
+                  <input
+                    required
+                    value={broadcastTitle}
+                    onChange={(e) => setBroadcastTitle(e.target.value)}
+                    placeholder={isAr ? 'مثال: فتح باب التقديم للأنشطة الطلابية لعام 2026 🎉' : 'Campus Announcement Title'}
+                    className="mt-1 w-full rounded-xl border border-input bg-secondary/30 px-3 py-2 text-sm outline-none focus:border-gold"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">{isAr ? 'مضمون الرسالة والتوجيه' : 'Message Body'}</label>
+                  <textarea
+                    required
+                    rows={3}
+                    value={broadcastBody}
+                    onChange={(e) => setBroadcastBody(e.target.value)}
+                    placeholder={isAr ? 'تفاصيل التنبيه الموجه لكافة طلاب جامعة المنصورة الأهلية...' : 'Announcement details...'}
+                    className="mt-1 w-full rounded-xl border border-input bg-secondary/30 px-3 py-2 text-sm outline-none focus:border-gold resize-none"
+                  />
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowBroadcast(false)}
+                    className="rounded-xl border border-border px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-secondary"
+                  >
+                    {isAr ? 'إلغاء' : 'Cancel'}
+                  </button>
+                  <button
+                    type="submit"
+                    className="rounded-xl bg-gold px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-gold/90 transition-colors"
+                  >
+                    {isAr ? 'إرسال التنبيه الآن 🎉' : 'Broadcast Now'}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       <div className="grid gap-6 md:grid-cols-2">
         <Panel className="space-y-4">
           <div className="flex items-center justify-between">
-            <h4 className="font-display text-base font-semibold">حالة الفرق والأنشطة بالكلية</h4>
+            <h4 className="font-display text-base font-semibold">{isAr ? 'حالة الفرق والأنشطة بالكلية' : 'Faculty Teams Status'}</h4>
             <span className="rounded-full bg-gold/15 px-2.5 py-0.5 text-xs font-semibold text-gold">
-              نشطة 100%
+              {isAr ? 'نشطة 100%' : '100% Active'}
             </span>
           </div>
           <div className="space-y-3">
@@ -93,9 +184,9 @@ function Overview() {
 
         <Panel className="space-y-4">
           <div className="flex items-center justify-between">
-            <h4 className="font-display text-base font-semibold">حسابات ليدرز الفرق الرسمية</h4>
+            <h4 className="font-display text-base font-semibold">{isAr ? 'حسابات ليدرز الفرق الرسمية' : 'Official Team Leaders'}</h4>
             <span className="rounded-full bg-primary/15 px-2.5 py-0.5 text-xs font-semibold text-primary">
-              مفعلة
+              {isAr ? 'مفعلة' : 'Active'}
             </span>
           </div>
           <div className="space-y-3">
@@ -122,11 +213,14 @@ function Overview() {
 
 function AdminsManagement() {
   const { admins, addAdmin, removeAdmin, clubs } = useSystem()
-  const [showModal, setShowModal] = useState(false)
+  const { language } = useLanguage()
+  const isAr = language === 'ar'
+  const currentFaculties = faculties[language] || faculties.ar
 
+  const [showModal, setShowModal] = useState(false)
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
-  const [faculty, setFaculty] = useState(faculties[0])
+  const [faculty, setFaculty] = useState(currentFaculties[0])
   const [selectedClub, setSelectedClub] = useState(clubs[0]?.name || 'Robotics & AI Society')
 
   const handleCreate = (e: React.FormEvent) => {
@@ -146,17 +240,17 @@ function AdminsManagement() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 text-start rtl:text-right">
       <SectionTitle
-        title="إدارة حسابات قادة الفرق (Leaders)"
-        subtitle="إنشاء حسابات الليدرز وتوزيع الإشراف على الفرق والأنشطة."
+        title={isAr ? 'إدارة حسابات قادة الفرق (Leaders)' : 'Team Leaders Management'}
+        subtitle={isAr ? 'إنشاء حسابات الليدرز وتوزيع الإشراف على الفرق والأنشطة.' : 'Create leader accounts and assign supervision to teams.'}
         action={
           <button
             onClick={() => setShowModal(true)}
             className="inline-flex items-center gap-2 rounded-xl bg-gold px-4 py-2.5 text-sm font-semibold text-gold-foreground transition-transform hover:scale-[1.02]"
           >
             <UserPlus className="size-4" />
-            إنشاء حساب ليدر جديد
+            {isAr ? 'إنشاء حساب ليدر جديد' : 'Create New Leader Account'}
           </button>
         }
       />
@@ -173,20 +267,20 @@ function AdminsManagement() {
                   <p className="font-medium text-foreground">{a.name}</p>
                   <p className="text-xs text-muted-foreground flex items-center gap-2 mt-0.5">
                     <Mail className="size-3" />
-                    {a.email} · كلية {a.faculty}
+                    {a.email} · {isAr ? `كلية ${a.faculty}` : a.faculty}
                   </p>
                 </div>
               </div>
 
               <div className="flex items-center gap-3">
-                <div className="text-right">
+                <div className="text-end rtl:text-left">
                   <p className="text-xs font-semibold text-primary">{a.assignedTeamName}</p>
-                  <p className="text-[11px] text-muted-foreground">تاريخ الإنشاء: {a.createdAt}</p>
+                  <p className="text-[11px] text-muted-foreground">{isAr ? `تاريخ الإنشاء: ${a.createdAt}` : `Created: ${a.createdAt}`}</p>
                 </div>
                 <button
                   onClick={() => removeAdmin(a.id)}
                   className="rounded-lg border border-border p-2 text-destructive hover:bg-destructive/15 transition-colors"
-                  title="حذف حساب الليدر"
+                  title={isAr ? 'حذف حساب الليدر' : 'Remove Leader'}
                 >
                   <Trash2 className="size-4" />
                 </button>
@@ -199,7 +293,7 @@ function AdminsManagement() {
       {/* Modal create admin */}
       <AnimatePresence>
         {showModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 text-start rtl:text-right">
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -209,7 +303,7 @@ function AdminsManagement() {
               <div className="flex items-center justify-between">
                 <h3 className="font-display text-lg font-bold flex items-center gap-2">
                   <UserPlus className="size-5 text-gold" />
-                  إنشاء حساب ليدر جديد
+                  {isAr ? 'إنشاء حساب ليدر جديد' : 'Create Leader Account'}
                 </h3>
                 <button onClick={() => setShowModal(false)} className="text-muted-foreground hover:text-foreground">
                   <X className="size-5" />
@@ -218,47 +312,47 @@ function AdminsManagement() {
 
               <form onSubmit={handleCreate} className="space-y-4">
                 <div>
-                  <label className="text-xs font-medium text-muted-foreground">اسم الليدر (أو المشرف)</label>
+                  <label className="text-xs font-medium text-muted-foreground">{isAr ? 'اسم الليدر (أو المشرف)' : 'Leader Name'}</label>
                   <input
                     required
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    placeholder="مثال: د. أحمد المحمدي"
+                    placeholder={isAr ? 'مثال: د. أحمد المحمدي' : 'e.g. Dr. Ahmed'}
                     className="mt-1 w-full rounded-xl border border-input bg-secondary/30 px-3 py-2 text-sm outline-none focus:border-gold"
                   />
                 </div>
 
                 <div>
-                  <label className="text-xs font-medium text-muted-foreground">البريد الإلكتروني الجامعي</label>
+                  <label className="text-xs font-medium text-muted-foreground">{isAr ? 'البريد الإلكتروني الجامعي' : 'University Email'}</label>
                   <input
                     required
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="admin@mnuh.edu.eg"
-                    className="mt-1 w-full rounded-xl border border-input bg-secondary/30 px-3 py-2 text-sm outline-none focus:border-gold"
+                    className="mt-1 w-full rounded-xl border border-input bg-secondary/30 px-3 py-2 text-sm outline-none focus:border-gold font-sans"
                   />
                 </div>
 
                 <div>
-                  <label className="text-xs font-medium text-muted-foreground">الكلية</label>
+                  <label className="text-xs font-medium text-muted-foreground">{isAr ? 'الكلية' : 'Faculty'}</label>
                   <select
                     value={faculty}
                     onChange={(e) => setFaculty(e.target.value)}
-                    className="mt-1 w-full rounded-xl border border-input bg-secondary/30 px-3 py-2 text-sm outline-none focus:border-gold"
+                    className="mt-1 w-full rounded-xl border border-input bg-secondary/30 px-3 py-2 text-sm outline-none focus:border-gold text-foreground"
                   >
-                    {faculties.map((f) => (
+                    {currentFaculties.map((f) => (
                       <option key={f} value={f}>{f}</option>
                     ))}
                   </select>
                 </div>
 
                 <div>
-                  <label className="text-xs font-medium text-muted-foreground">الفريق المخصص للإشراف عليه</label>
+                  <label className="text-xs font-medium text-muted-foreground">{isAr ? 'الفريق المخصص للإشراف عليه' : 'Assigned Team'}</label>
                   <select
                     value={selectedClub}
                     onChange={(e) => setSelectedClub(e.target.value)}
-                    className="mt-1 w-full rounded-xl border border-input bg-secondary/30 px-3 py-2 text-sm outline-none focus:border-gold"
+                    className="mt-1 w-full rounded-xl border border-input bg-secondary/30 px-3 py-2 text-sm outline-none focus:border-gold text-foreground"
                   >
                     {clubs.map((c) => (
                       <option key={c.id} value={c.name}>{c.name}</option>
@@ -272,13 +366,13 @@ function AdminsManagement() {
                     onClick={() => setShowModal(false)}
                     className="rounded-xl border border-border px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-secondary"
                   >
-                    إلغاء
+                    {isAr ? 'إلغاء' : 'Cancel'}
                   </button>
                   <button
                     type="submit"
                     className="rounded-xl bg-gold px-4 py-2 text-sm font-semibold text-gold-foreground hover:scale-105 transition-transform"
                   >
-                    إنشاء وتعيين
+                    {isAr ? 'إنشاء وتعيين' : 'Create & Assign'}
                   </button>
                 </div>
               </form>
@@ -292,11 +386,14 @@ function AdminsManagement() {
 
 function ClubsManagement() {
   const { clubs, addClub, deleteClub } = useSystem()
-  const [showModal, setShowModal] = useState(false)
+  const { language } = useLanguage()
+  const isAr = language === 'ar'
+  const currentFaculties = faculties[language] || faculties.ar
 
+  const [showModal, setShowModal] = useState(false)
   const [clubName, setClubName] = useState('')
   const [category, setCategory] = useState<Category>('Tech')
-  const [faculty, setFaculty] = useState(faculties[0])
+  const [faculty, setFaculty] = useState(currentFaculties[0])
   const [tagline, setTagline] = useState('')
   const [description, setDescription] = useState('')
   const [openRoles, setOpenRoles] = useState('Front-end Developer, UI/UX Designer')
@@ -309,11 +406,11 @@ function ClubsManagement() {
       name: clubName,
       category,
       faculty,
-      tagline: tagline || 'فريق جديد معتمد من الجامعة.',
+      tagline: tagline || (isAr ? 'فريق جديد معتمد من الجامعة.' : 'Official new university team.'),
       description,
       image: '/clubs/robotics.png',
-      achievements: ['فريق حديث تم إطلاقه بالكلية'],
-      events: [{ title: 'اللقاء التعريفي الأول', date: 'قريباً', location: 'المبنى الرئيسي' }],
+      achievements: [isAr ? 'فريق حديث تم إطلاقه بالكلية' : 'Newly launched university team'],
+      events: [{ title: isAr ? 'اللقاء التعريفي الأول' : 'Orientation Session', date: 'Soon', location: 'Main Building' }],
       openRoles: openRoles.split(',').map((r) => r.trim()).filter(Boolean),
     })
 
@@ -324,17 +421,17 @@ function ClubsManagement() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 text-start rtl:text-right">
       <SectionTitle
-        title="إضافة وإدارة الفرق والأنشطة"
-        subtitle="إنشاء فرق جديدة وتفعيل الأنشطة بالجامعة فوراً."
+        title={isAr ? 'إضافة وإدارة الفرق والأنشطة' : 'Clubs & Teams Management'}
+        subtitle={isAr ? 'إنشاء فرق جديدة وتفعيل الأنشطة بالجامعة فوراً.' : 'Create new teams and activate campus student activities.'}
         action={
           <button
             onClick={() => setShowModal(true)}
             className="inline-flex items-center gap-2 rounded-xl bg-gold px-4 py-2.5 text-sm font-semibold text-gold-foreground transition-transform hover:scale-[1.02]"
           >
             <Plus className="size-4" />
-            إضافة تيم جديد
+            {isAr ? 'إضافة تيم جديد' : 'Add New Team'}
           </button>
         }
       />
@@ -350,20 +447,20 @@ function ClubsManagement() {
                 <button
                   onClick={() => deleteClub(c.id)}
                   className="text-muted-foreground hover:text-destructive transition-colors p-1"
-                  title="حذف التيم"
+                  title={isAr ? 'حذف التيم' : 'Delete Team'}
                 >
                   <Trash2 className="size-4" />
                 </button>
               </div>
               <h4 className="mt-2 font-display text-lg font-bold">{c.name}</h4>
-              <p className="text-xs text-muted-foreground">{c.faculty} · {c.members} عضو</p>
+              <p className="text-xs text-muted-foreground">{c.faculty} · {c.members} {isAr ? 'عضو' : 'members'}</p>
               <p className="mt-2 text-xs text-foreground/80 line-clamp-2">{c.description}</p>
             </div>
 
             <div className="pt-2 border-t border-border/60 flex items-center justify-between text-xs">
-              <span className="text-muted-foreground">{c.openRoles.length} أدوار مفتوحة</span>
+              <span className="text-muted-foreground">{c.openRoles.length} {isAr ? 'أدوار مفتوحة' : 'open roles'}</span>
               <span className="font-semibold text-gold flex items-center gap-1">
-                <CheckCircle2 className="size-3.5" /> متاح للتقديم
+                <CheckCircle2 className="size-3.5" /> {isAr ? 'متاح للتقديم' : 'Recruiting'}
               </span>
             </div>
           </Panel>
@@ -373,7 +470,7 @@ function ClubsManagement() {
       {/* Modal Add Club */}
       <AnimatePresence>
         {showModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 text-start rtl:text-right">
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -383,7 +480,7 @@ function ClubsManagement() {
               <div className="flex items-center justify-between">
                 <h3 className="font-display text-lg font-bold flex items-center gap-2">
                   <Sparkles className="size-5 text-gold" />
-                  إضافة تيم / نشاط جديد في الكلية
+                  {isAr ? 'إضافة تيم / نشاط جديد في الكلية' : 'Add New Faculty Team'}
                 </h3>
                 <button onClick={() => setShowModal(false)} className="text-muted-foreground hover:text-foreground">
                   <X className="size-5" />
@@ -392,23 +489,23 @@ function ClubsManagement() {
 
               <form onSubmit={handleCreateClub} className="space-y-4">
                 <div>
-                  <label className="text-xs font-medium text-muted-foreground">اسم الفريق / النشاط</label>
+                  <label className="text-xs font-medium text-muted-foreground">{isAr ? 'اسم الفريق / النشاط' : 'Team / Activity Name'}</label>
                   <input
                     required
                     value={clubName}
                     onChange={(e) => setClubName(e.target.value)}
-                    placeholder="مثال: نادي الذكاء الاصطناعي والابتكار"
+                    placeholder={isAr ? 'مثال: نادي الذكاء الاصطناعي والابتكار' : 'e.g. AI & Innovation Society'}
                     className="mt-1 w-full rounded-xl border border-input bg-secondary/30 px-3 py-2 text-sm outline-none focus:border-gold"
                   />
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-xs font-medium text-muted-foreground">المجال / التصنيف</label>
+                    <label className="text-xs font-medium text-muted-foreground">{isAr ? 'المجال / التصنيف' : 'Category'}</label>
                     <select
                       value={category}
                       onChange={(e) => setCategory(e.target.value as Category)}
-                      className="mt-1 w-full rounded-xl border border-input bg-secondary/30 px-3 py-2 text-sm outline-none focus:border-gold"
+                      className="mt-1 w-full rounded-xl border border-input bg-secondary/30 px-3 py-2 text-sm outline-none focus:border-gold text-foreground"
                     >
                       {categories.map((cat) => (
                         <option key={cat} value={cat}>{cat}</option>
@@ -416,13 +513,13 @@ function ClubsManagement() {
                     </select>
                   </div>
                   <div>
-                    <label className="text-xs font-medium text-muted-foreground">الكلية التابع لها</label>
+                    <label className="text-xs font-medium text-muted-foreground">{isAr ? 'الكلية التابع لها' : 'Faculty'}</label>
                     <select
                       value={faculty}
                       onChange={(e) => setFaculty(e.target.value)}
-                      className="mt-1 w-full rounded-xl border border-input bg-secondary/30 px-3 py-2 text-sm outline-none focus:border-gold"
+                      className="mt-1 w-full rounded-xl border border-input bg-secondary/30 px-3 py-2 text-sm outline-none focus:border-gold text-foreground"
                     >
-                      {faculties.map((f) => (
+                      {currentFaculties.map((f) => (
                         <option key={f} value={f}>{f}</option>
                       ))}
                     </select>
@@ -430,33 +527,33 @@ function ClubsManagement() {
                 </div>
 
                 <div>
-                  <label className="text-xs font-medium text-muted-foreground">الشعار المختصر (Tagline)</label>
+                  <label className="text-xs font-medium text-muted-foreground">{isAr ? 'الشعار المختصر (Tagline)' : 'Tagline'}</label>
                   <input
                     value={tagline}
                     onChange={(e) => setTagline(e.target.value)}
-                    placeholder="مثال: ابنِ مستقبلك التكنولوجي معنا."
+                    placeholder={isAr ? 'مثال: ابنِ مستقبلك التكنولوجي معنا.' : 'Build the future with us.'}
                     className="mt-1 w-full rounded-xl border border-input bg-secondary/30 px-3 py-2 text-sm outline-none focus:border-gold"
                   />
                 </div>
 
                 <div>
-                  <label className="text-xs font-medium text-muted-foreground">وصف الفريق والأنشطة</label>
+                  <label className="text-xs font-medium text-muted-foreground">{isAr ? 'وصف الفريق والأنشطة' : 'Team Description'}</label>
                   <textarea
                     required
                     rows={3}
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
-                    placeholder="اكتب وصفاً جذاباً للفريق وأهدافه والأنشطة التي يقدمها للطلاب..."
+                    placeholder={isAr ? 'اكتب وصفاً جذاباً للفريق وأهدافه والأنشطة التي يقدمها للطلاب...' : 'Describe team goals and activities...'}
                     className="mt-1 w-full rounded-xl border border-input bg-secondary/30 px-3 py-2 text-sm outline-none focus:border-gold resize-none"
                   />
                 </div>
 
                 <div>
-                  <label className="text-xs font-medium text-muted-foreground">الوظائف والأدوار المتاحة للتقديم (مفصولة بفاصلة)</label>
+                  <label className="text-xs font-medium text-muted-foreground">{isAr ? 'الوظائف والأدوار المتاحة للتقديم (مفصولة بفاصلة)' : 'Open Roles (comma-separated)'}</label>
                   <input
                     value={openRoles}
                     onChange={(e) => setOpenRoles(e.target.value)}
-                    placeholder="مثال: مصمم جرافيك، مطور برمجة، مسؤول تنظيم"
+                    placeholder="Front-end Developer, UI/UX Designer"
                     className="mt-1 w-full rounded-xl border border-input bg-secondary/30 px-3 py-2 text-sm outline-none focus:border-gold"
                   />
                 </div>
@@ -467,13 +564,13 @@ function ClubsManagement() {
                     onClick={() => setShowModal(false)}
                     className="rounded-xl border border-border px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-secondary"
                   >
-                    إلغاء
+                    {isAr ? 'إلغاء' : 'Cancel'}
                   </button>
                   <button
                     type="submit"
                     className="rounded-xl bg-gold px-4 py-2 text-sm font-semibold text-gold-foreground hover:scale-105 transition-transform"
                   >
-                    حفظ وإضافة الفريق
+                    {isAr ? 'حفظ وإضافة الفريق' : 'Save & Add Team'}
                   </button>
                 </div>
               </form>
@@ -486,10 +583,13 @@ function ClubsManagement() {
 }
 
 export function OwnerWorkspace() {
+  const { language } = useLanguage()
+  const isAr = language === 'ar'
+
   const tabs: DashboardTab[] = [
-    { id: 'overview', label: 'Overview', icon: Building2, render: () => <Overview /> },
-    { id: 'admins', label: 'Team Leaders', icon: ShieldCheck, render: () => <AdminsManagement /> },
-    { id: 'clubs', label: 'Teams & Clubs', icon: LayoutGrid, render: () => <ClubsManagement /> },
+    { id: 'overview', label: isAr ? 'نظرة عامة' : 'Overview', icon: Building2, render: () => <Overview /> },
+    { id: 'admins', label: isAr ? 'ليدرز الفرق' : 'Team Leaders', icon: ShieldCheck, render: () => <AdminsManagement /> },
+    { id: 'clubs', label: isAr ? 'الفرق والأندية' : 'Teams & Clubs', icon: LayoutGrid, render: () => <ClubsManagement /> },
   ]
 
   return (
@@ -497,13 +597,13 @@ export function OwnerWorkspace() {
       tabs={tabs}
       accent="text-gold"
       sidebarHeader={
-        <div>
+        <div className="text-start rtl:text-right">
           <p className="text-xs uppercase tracking-wide text-muted-foreground">
-            إدارة الكلية والجامعة
+            {isAr ? 'إدارة الكلية والجامعة' : 'University Management'}
           </p>
           <p className="mt-1 flex items-center gap-1.5 text-sm font-bold text-gold">
             <Building2 className="size-4" />
-            Platform Master Control
+            {isAr ? 'الواجهة الرئيسية للمناصب (Master Control)' : 'Platform Master Control'}
           </p>
         </div>
       }

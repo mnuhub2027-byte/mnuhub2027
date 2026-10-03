@@ -1,4 +1,6 @@
-export type Category =
+import json
+
+content = """export type Category =
   | 'Tech'
   | 'Art'
   | 'Sports'
@@ -21,15 +23,10 @@ export type Club = {
   openRoles: string[]
 }
 
-export const categories: Category[] = [
-  'Tech',
-  'Art',
-  'Sports',
-  'Charity',
-  'Music',
-  'Business',
-  'Debate',
-]
+export const categories = {
+  en: ['Tech', 'Art', 'Sports', 'Charity', 'Music', 'Business', 'Debate'],
+  ar: ['تكنولوجيا', 'فنون', 'رياضة', 'أعمال خيرية', 'موسيقى', 'أعمال', 'مناظرات']
+}
 
 export const faculties = {
   en: [
@@ -306,11 +303,10 @@ export const applicants = {
   ]
 }
 
-export const pipelineStages: ('Reviewing' | 'Interview' | 'Accepted')[] = [
-  'Reviewing',
-  'Interview',
-  'Accepted',
-]
+export const pipelineStages = {
+  en: ['Reviewing', 'Interview', 'Accepted'],
+  ar: ['قيد المراجعة', 'مقابلة', 'مقبول']
+}
 
 export type TeamRole = 'Leader' | 'Vice Leader' | 'Member'
 
@@ -497,3 +493,9 @@ export const analytics = {
     ]
   }
 }
+"""
+
+with open("c:/Users/Ahmed Bayaa/Documents/antigravity/mnuhub2027-main/lib/data.ts", "w", encoding="utf-8") as f:
+    f.write(content)
+
+print("Data successfully updated to support i18n.")

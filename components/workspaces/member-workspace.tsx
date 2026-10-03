@@ -6,7 +6,6 @@ import {
   Bell,
   CalendarDays,
   ListTodo,
-  Users,
   UserCircle,
   Pin,
   MapPin,
@@ -24,17 +23,21 @@ import {
   ChevronDown,
   ChevronUp,
   RotateCcw,
+  Users,
+  LayoutGrid,
+  List,
 } from 'lucide-react'
 import { useSystem } from '@/lib/system-context'
-import { useRole } from '@/components/role-context'
 import { createClient } from '@/lib/supabase/client'
 import { StatusBadge } from '@/components/status-badge'
 import {
-  DashboardShell,
   Panel,
   SectionTitle,
   type DashboardTab,
+  DashboardShell,
 } from '@/components/dashboard-shell'
+import { useLanguage } from '@/lib/i18n/LanguageContext'
+import { sanitizeUrl } from '@/lib/security'
 
 type MemberProfile = {
   name: string
@@ -55,14 +58,12 @@ function useMemberProfile(): MemberProfile | null {
     supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (!user) return
 
-      // Get profile
       const { data: prof } = await supabase
         .from('profiles')
         .select('full_name')
         .eq('id', user.id)
         .single()
 
-      // Get club membership — fetch club_id too so we can sync context
       const { data: mem } = await supabase
         .from('club_members')
         .select('club_id, role, created_at, clubs(name)')
@@ -91,7 +92,6 @@ function useMemberProfile(): MemberProfile | null {
         email: user.email,
       })
 
-      // Sync club isolation: ensure context loads data for THIS member's club
       if (mem?.club_id && mem.club_id !== currentClubId) {
         await loadClubData(mem.club_id)
       }
@@ -103,12 +103,18 @@ function useMemberProfile(): MemberProfile | null {
 
 function Announcements() {
   const { announcements, teamEvents } = useSystem()
+  const { language } = useLanguage()
+  const isAr = language === 'ar'
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 text-start rtl:text-right">
       <SectionTitle
-        title="الإعلانات والأنشطة بالفريق"
-        subtitle="آخر التحديثات، الفعاليات، والتوجيهات الصادرة من قائد الفريق والمساعدين."
+        title={isAr ? 'الإعلانات والأنشطة بالفريق' : 'Team Announcements & Activities'}
+        subtitle={
+          isAr
+            ? 'آخر التحديثات، الفعاليات، والتوجيهات الصادرة من قائد الفريق والمساعدين.'
+            : 'Latest updates, events, and guidelines from team leaders and admins.'
+        }
       />
 
       {/* Team Events Banner */}
@@ -116,7 +122,7 @@ function Announcements() {
         <div className="space-y-3">
           <div className="flex items-center gap-2 text-sm font-semibold text-primary">
             <CalendarIcon className="size-4" />
-            <span>الفعاليات والأحداث القادمة للتيم ({teamEvents.length})</span>
+            <span>{isAr ? `الفعاليات والأحداث القادمة للتيم (${teamEvents.length})` : `Upcoming Team Events (${teamEvents.length})`}</span>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             {teamEvents.map((ev) => (
@@ -149,11 +155,11 @@ function Announcements() {
       <div className="space-y-3">
         <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
           <Megaphone className="size-4" />
-          <span>الإعلانات والتوجيهات</span>
+          <span>{isAr ? 'الإعلانات والتوجيهات' : 'Announcements & Directives'}</span>
         </div>
         {announcements.length === 0 && teamEvents.length === 0 ? (
           <Panel className="py-8 text-center text-sm text-muted-foreground">
-            لا توجد إعلانات أو فعاليات منشورة بالفريق حالياً.
+            {isAr ? 'لا توجد إعلانات أو فعاليات منشورة بالفريق حالياً.' : 'No announcements or events published yet.'}
           </Panel>
         ) : (
           announcements.map((a) => (
@@ -179,17 +185,19 @@ function Announcements() {
 
 function Calendar() {
   const { teamEvents } = useSystem()
+  const { language } = useLanguage()
+  const isAr = language === 'ar'
 
   return (
-    <div>
+    <div className="text-start rtl:text-right">
       <SectionTitle
-        title="جدول الأنشطة واللقاءات"
-        subtitle="مواعيد ورش العمل، المسابقات، واللقاءات القادمة بالفريق."
+        title={isAr ? 'جدول الأنشطة واللقاءات' : 'Activities & Meetings Calendar'}
+        subtitle={isAr ? 'مواعيد ورش العمل، المسابقات، واللقاءات القادمة بالفريق.' : 'Upcoming workshops, competitions, and team meetings.'}
       />
       <div className="space-y-3">
         {teamEvents.length === 0 ? (
           <Panel className="py-8 text-center text-sm text-muted-foreground">
-            لا توجد فعاليات مسجلة للفريق حالياً.
+            {isAr ? 'لا توجد فعاليات مسجلة للفريق حالياً.' : 'No events scheduled for the team currently.'}
           </Panel>
         ) : (
           teamEvents.map((e) => {
@@ -235,10 +243,12 @@ function Calendar() {
 
 function Tasks() {
   const { myTasks, toggleTaskStatus, members } = useSystem()
+  const { language } = useLanguage()
+  const isAr = language === 'ar'
   const profile = useMemberProfile()
   const [showCompleted, setShowCompleted] = useState(false)
+  const [taskView, setTaskView] = useState<'list' | 'kanban'>('list')
 
-  // Find corresponding member record from the team context
   const teamMember = members.find(
     (m) =>
       (profile?.userId && m.userId === profile.userId) ||
@@ -246,146 +256,286 @@ function Tasks() {
       (profile?.name && m.name.trim().toLowerCase() === profile.name.trim().toLowerCase())
   )
 
-  // Only show tasks assigned to this member specifically, or to everyone
   const visibleTasks = myTasks.filter((t) => {
-    // If assigned to all members, or no specific assignee was set
     if (!t.assigneeName || t.assigneeName === 'جميع أعضاء الفريق') {
       return true
     }
 
     const target = t.assigneeName.trim().toLowerCase()
 
-    if (profile?.name && target === profile.name.trim().toLowerCase()) {
-      return true
-    }
-
-    if (teamMember && target === teamMember.name.trim().toLowerCase()) {
-      return true
-    }
-
-    if (profile?.email && target === profile.email.trim().toLowerCase()) {
-      return true
-    }
+    if (profile?.name && target === profile.name.trim().toLowerCase()) return true
+    if (teamMember && target === teamMember.name.trim().toLowerCase()) return true
+    if (profile?.email && target === profile.email.trim().toLowerCase()) return true
 
     return false
   })
 
-  const pendingTasks = visibleTasks.filter((t) => t.status !== 'Done')
+  const todoTasks = visibleTasks.filter((t) => t.status !== 'In Progress' && t.status !== 'Done')
+  const inProgressTasks = visibleTasks.filter((t) => t.status === 'In Progress')
   const completedTasks = visibleTasks.filter((t) => t.status === 'Done')
+  const pendingTasks = visibleTasks.filter((t) => t.status !== 'Done')
 
   return (
-    <div className="space-y-6">
-      <SectionTitle
-        title="المهام المسندة لي"
-        subtitle="متابعة وتنفيذ مهامك داخل الفريق وتسليمها مباشرة."
-      />
+    <div className="space-y-6 text-start rtl:text-right">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <SectionTitle
+          title={isAr ? 'المهام المسندة لي' : 'My Assigned Tasks'}
+          subtitle={isAr ? 'متابعة وتنفيذ مهامك داخل الفريق وتسليمها مباشرة.' : 'Track, execute, and submit your team tasks directly.'}
+        />
+        <div className="flex items-center gap-1 self-start rounded-xl border border-border/80 bg-secondary/50 p-1">
+          <button
+            onClick={() => setTaskView('list')}
+            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+              taskView === 'list'
+                ? 'bg-background text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <List className="size-3.5" />
+            <span>{isAr ? 'قائمة' : 'List'}</span>
+          </button>
+          <button
+            onClick={() => setTaskView('kanban')}
+            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+              taskView === 'kanban'
+                ? 'bg-background text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <LayoutGrid className="size-3.5" />
+            <span>{isAr ? 'كانبان' : 'Kanban Board'}</span>
+          </button>
+        </div>
+      </div>
 
-      {/* Active / Pending Tasks */}
-      <div className="space-y-3">
-        {pendingTasks.length === 0 ? (
-          <Panel className="py-12 text-center">
-            <CheckCircle2 className="mx-auto size-12 text-chart-3/80 mb-3" />
-            <p className="text-base font-bold text-foreground">رائع! لا توجد مهام معلقة لديك حالياً 🎉</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              لقد قمت بإنجاز كافة مهامك المسندة، أو لم يتم إسناد مهام جديدة بعد.
-            </p>
-          </Panel>
-        ) : (
-          <AnimatePresence mode="popLayout">
-            {pendingTasks.map((t) => (
-              <motion.div
-                key={t.id}
-                layout
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.2 } }}
-              >
-                <Panel className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-chart-4/10 text-chart-4">
-                      <ListTodo className="size-4" />
-                    </div>
-                    <div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="font-semibold text-sm text-foreground">
-                          {t.title}
-                        </p>
-                        {t.assigneeName && t.assigneeName !== 'جميع أعضاء الفريق' ? (
-                          <span className="inline-flex items-center gap-1 rounded-md bg-chart-3/15 text-chart-3 px-2 py-0.5 text-[11px] font-semibold">
-                            <User className="size-3" />
-                            المكلف: {t.assigneeName}
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 rounded-md bg-secondary text-muted-foreground px-2 py-0.5 text-[11px] font-medium">
-                            <Users className="size-3" />
-                            الجميع
-                          </span>
-                        )}
-                      </div>
-                      <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                        <span className="text-xs text-muted-foreground font-sans">
-                          تاريخ التسليم: {t.due}
-                        </span>
-                        {t.submissionType === 'whatsapp' && t.submissionValue && (
-                          <a
-                            href={`https://wa.me/${t.submissionValue.replace(/[^0-9]/g, '')}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-1 text-xs font-semibold text-emerald-400 hover:bg-emerald-500/25 transition-colors"
-                            title="إرسال الحل عبر واتساب"
-                          >
-                            <MessageCircle className="size-3.5" />
-                            <span>تسليم واتساب ({t.submissionValue})</span>
-                            <ExternalLink className="size-2.5" />
-                          </a>
-                        )}
-                        {t.submissionType === 'link' && t.submissionValue && (
-                          <a
-                            href={t.submissionValue.startsWith('http') ? t.submissionValue : `https://${t.submissionValue}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 rounded-lg bg-primary/15 border border-primary/30 px-2.5 py-1 text-xs font-semibold text-primary hover:bg-primary/25 transition-colors"
-                            title="فتح رابط التسليم"
-                          >
-                            <FileText className="size-3.5" />
-                            <span>رابط التسليم (Drive / فورم)</span>
-                            <ExternalLink className="size-2.5" />
-                          </a>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-2 sm:self-center">
+      {taskView === 'kanban' ? (
+        <div className="grid gap-4 sm:grid-cols-3">
+          {/* Column 1: To Do */}
+          <div className="space-y-3 rounded-2xl border border-border/60 bg-secondary/20 p-3">
+            <div className="flex items-center justify-between pb-2 border-b border-border/40">
+              <span className="font-bold text-xs flex items-center gap-1.5 text-muted-foreground">
+                <span className="size-2 rounded-full bg-amber-500"></span>
+                {isAr ? 'قيد الانتظار (To Do)' : 'To Do'}
+              </span>
+              <span className="rounded-full bg-amber-500/10 text-amber-500 font-sans px-2 py-0.5 text-[11px] font-bold">
+                {todoTasks.length}
+              </span>
+            </div>
+            {todoTasks.length === 0 ? (
+              <p className="py-6 text-center text-xs text-muted-foreground">
+                {isAr ? 'لا توجد مهام معلقة' : 'No tasks'}
+              </p>
+            ) : (
+              todoTasks.map((t) => (
+                <Panel key={t.id} className="p-3.5 space-y-2.5 bg-background shadow-xs hover:border-border transition-colors">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="font-semibold text-xs text-foreground line-clamp-2">{t.title}</p>
                     <StatusBadge status={t.priority} />
-                    <StatusBadge status={t.status} />
-
-                    {/* Prominent Done Button */}
+                  </div>
+                  <div className="text-[11px] text-muted-foreground font-sans">
+                    {isAr ? `تاريخ التسليم: ${t.due}` : `Due: ${t.due}`}
+                  </div>
+                  <div className="pt-2 flex items-center justify-between border-t border-border/40">
+                    <span className="text-[11px] text-muted-foreground font-medium">
+                      {t.assigneeName || (isAr ? 'الجميع' : 'Everyone')}
+                    </span>
                     <button
                       onClick={() => toggleTaskStatus(t.id)}
-                      className="inline-flex items-center gap-1.5 rounded-xl bg-chart-3 px-3 py-1.5 text-xs font-bold text-chart-3-foreground shadow-sm transition-all duration-200 hover:scale-[1.04] hover:bg-chart-3/90"
-                      title="تم التسليم - إنهاء المهمة"
+                      className="rounded-lg bg-primary/10 text-primary px-2.5 py-1 text-[11px] font-semibold hover:bg-primary/20 transition-colors"
                     >
-                      <CheckCircle2 className="size-3.5" />
-                      Done (تم التسليم)
+                      {isAr ? 'إنجاز ✓' : 'Complete ✓'}
                     </button>
                   </div>
                 </Panel>
-              </motion.div>
-            ))}
-          </AnimatePresence>
-        )}
-      </div>
+              ))
+            )}
+          </div>
 
-      {/* Completed Tasks Accordion */}
-      {completedTasks.length > 0 && (
+          {/* Column 2: In Progress */}
+          <div className="space-y-3 rounded-2xl border border-border/60 bg-secondary/20 p-3">
+            <div className="flex items-center justify-between pb-2 border-b border-border/40">
+              <span className="font-bold text-xs flex items-center gap-1.5 text-muted-foreground">
+                <span className="size-2 rounded-full bg-blue-500"></span>
+                {isAr ? 'جاري العمل (In Progress)' : 'In Progress'}
+              </span>
+              <span className="rounded-full bg-blue-500/10 text-blue-500 font-sans px-2 py-0.5 text-[11px] font-bold">
+                {inProgressTasks.length}
+              </span>
+            </div>
+            {inProgressTasks.length === 0 ? (
+              <p className="py-6 text-center text-xs text-muted-foreground">
+                {isAr ? 'لا توجد مهام قيد التنفيذ' : 'No tasks'}
+              </p>
+            ) : (
+              inProgressTasks.map((t) => (
+                <Panel key={t.id} className="p-3.5 space-y-2.5 bg-background shadow-xs hover:border-border transition-colors">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="font-semibold text-xs text-foreground line-clamp-2">{t.title}</p>
+                    <StatusBadge status={t.priority} />
+                  </div>
+                  <div className="text-[11px] text-muted-foreground font-sans">
+                    {isAr ? `تاريخ التسليم: ${t.due}` : `Due: ${t.due}`}
+                  </div>
+                  <div className="pt-2 flex items-center justify-between border-t border-border/40">
+                    <span className="text-[11px] text-muted-foreground font-medium">
+                      {t.assigneeName || (isAr ? 'الجميع' : 'Everyone')}
+                    </span>
+                    <button
+                      onClick={() => toggleTaskStatus(t.id)}
+                      className="rounded-lg bg-chart-3 text-chart-3-foreground px-2.5 py-1 text-[11px] font-semibold hover:bg-chart-3/90 transition-colors"
+                    >
+                      {isAr ? 'تسليم ✓' : 'Submit ✓'}
+                    </button>
+                  </div>
+                </Panel>
+              ))
+            )}
+          </div>
+
+          {/* Column 3: Done */}
+          <div className="space-y-3 rounded-2xl border border-border/60 bg-secondary/20 p-3">
+            <div className="flex items-center justify-between pb-2 border-b border-border/40">
+              <span className="font-bold text-xs flex items-center gap-1.5 text-muted-foreground">
+                <span className="size-2 rounded-full bg-emerald-500"></span>
+                {isAr ? 'مكتملة ومسلمة (Done)' : 'Done'}
+              </span>
+              <span className="rounded-full bg-emerald-500/10 text-emerald-500 font-sans px-2 py-0.5 text-[11px] font-bold">
+                {completedTasks.length}
+              </span>
+            </div>
+            {completedTasks.length === 0 ? (
+              <p className="py-6 text-center text-xs text-muted-foreground">
+                {isAr ? 'لا توجد مهام مكتملة بعد' : 'No tasks'}
+              </p>
+            ) : (
+              completedTasks.map((t) => (
+                <Panel key={t.id} className="p-3.5 space-y-2.5 bg-background/60 shadow-xs border-emerald-500/20">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="font-semibold text-xs text-muted-foreground line-through line-clamp-2">{t.title}</p>
+                    <span className="rounded-md bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-bold text-emerald-400">✓</span>
+                  </div>
+                  <div className="pt-2 flex items-center justify-between border-t border-border/40">
+                    <span className="text-[11px] text-muted-foreground">
+                      {isAr ? 'تم التسليم' : 'Submitted'}
+                    </span>
+                    <button
+                      onClick={() => toggleTaskStatus(t.id)}
+                      className="rounded-lg border border-border px-2 py-0.5 text-[10px] text-muted-foreground hover:bg-secondary transition-colors"
+                    >
+                      {isAr ? 'إعادة فتح' : 'Reopen'}
+                    </button>
+                  </div>
+                </Panel>
+              ))
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {pendingTasks.length === 0 ? (
+            <Panel className="py-12 text-center">
+              <CheckCircle2 className="mx-auto size-12 text-chart-3/80 mb-3" />
+              <p className="text-base font-bold text-foreground">
+                {isAr ? 'رائع! لا توجد مهام معلقة لديك حالياً 🎉' : 'Awesome! No pending tasks currently 🎉'}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {isAr
+                  ? 'لقد قمت بإنجاز كافة مهامك المسندة، أو لم يتم إسناد مهام جديدة بعد.'
+                  : 'You have completed all assigned tasks or no new tasks have been assigned.'}
+              </p>
+            </Panel>
+          ) : (
+            <AnimatePresence mode="popLayout">
+              {pendingTasks.map((t) => (
+                <motion.div
+                  key={t.id}
+                  layout
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.2 } }}
+                >
+                  <Panel className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-chart-4/10 text-chart-4">
+                        <ListTodo className="size-4" />
+                      </div>
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="font-semibold text-sm text-foreground">
+                            {t.title}
+                          </p>
+                          {t.assigneeName && t.assigneeName !== 'جميع أعضاء الفريق' ? (
+                            <span className="inline-flex items-center gap-1 rounded-md bg-chart-3/15 text-chart-3 px-2 py-0.5 text-[11px] font-semibold">
+                              <User className="size-3" />
+                              {isAr ? `المكلف: ${t.assigneeName}` : `Assigned to: ${t.assigneeName}`}
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 rounded-md bg-secondary text-muted-foreground px-2 py-0.5 text-[11px] font-medium">
+                              <Users className="size-3" />
+                              {isAr ? 'الجميع' : 'Everyone'}
+                            </span>
+                          )}
+                        </div>
+                        <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                          <span className="text-xs text-muted-foreground font-sans">
+                            {isAr ? `تاريخ التسليم: ${t.due}` : `Due Date: ${t.due}`}
+                          </span>
+                          {t.submissionType === 'whatsapp' && t.submissionValue && (
+                            <a
+                              href={sanitizeUrl(`https://wa.me/${t.submissionValue.replace(/[^0-9]/g, '')}`)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-1 text-xs font-semibold text-emerald-400 hover:bg-emerald-500/25 transition-colors"
+                            >
+                              <MessageCircle className="size-3.5" />
+                              <span>{isAr ? `تسليم واتساب (${t.submissionValue})` : `WhatsApp Submission (${t.submissionValue})`}</span>
+                              <ExternalLink className="size-2.5" />
+                            </a>
+                          )}
+                          {t.submissionType === 'link' && t.submissionValue && (
+                            <a
+                              href={sanitizeUrl(t.submissionValue.startsWith('http') ? t.submissionValue : `https://${t.submissionValue}`)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 rounded-lg bg-primary/15 border border-primary/30 px-2.5 py-1 text-xs font-semibold text-primary hover:bg-primary/25 transition-colors"
+                            >
+                              <FileText className="size-3.5" />
+                              <span>{isAr ? 'رابط التسليم (Drive / فورم)' : 'Submission Link (Drive / Form)'}</span>
+                              <ExternalLink className="size-2.5" />
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2 sm:self-center">
+                      <StatusBadge status={t.priority} />
+                      <StatusBadge status={t.status} />
+
+                      <button
+                        onClick={() => toggleTaskStatus(t.id)}
+                        className="inline-flex items-center gap-1.5 rounded-xl bg-chart-3 px-3 py-1.5 text-xs font-bold text-chart-3-foreground shadow-sm transition-all duration-200 hover:scale-[1.04] hover:bg-chart-3/90"
+                      >
+                        <CheckCircle2 className="size-3.5" />
+                        {isAr ? 'تم التسليم (Done)' : 'Done (Submitted)'}
+                      </button>
+                    </div>
+                  </Panel>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          )}
+        </div>
+      )}
+
+      {completedTasks.length > 0 && taskView === 'list' && (
         <div className="pt-2 border-t border-border/40">
           <button
             onClick={() => setShowCompleted(!showCompleted)}
             className="flex items-center gap-2 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
           >
             {showCompleted ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
-            <span>المهام المكتملة المسلمة ({completedTasks.length})</span>
+            <span>{isAr ? `المهام المكتملة المسلمة (${completedTasks.length})` : `Completed Tasks (${completedTasks.length})`}</span>
           </button>
 
           {showCompleted && (
@@ -399,18 +549,21 @@ function Tasks() {
                     <CheckCircle2 className="size-4 text-chart-3 shrink-0" />
                     <div>
                       <p className="text-sm font-medium line-through text-muted-foreground">{t.title}</p>
-                      <span className="text-[11px] text-muted-foreground font-sans">تاريخ التسليم: {t.due}</span>
+                      <span className="text-[11px] text-muted-foreground font-sans">
+                        {isAr ? `تاريخ التسليم: ${t.due}` : `Due: ${t.due}`}
+                      </span>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="rounded-md bg-chart-3/15 px-2 py-0.5 text-[10px] font-bold text-chart-3">مكتملة ✓</span>
+                    <span className="rounded-md bg-chart-3/15 px-2 py-0.5 text-[10px] font-bold text-chart-3">
+                      {isAr ? 'مكتملة ✓' : 'Completed ✓'}
+                    </span>
                     <button
                       onClick={() => toggleTaskStatus(t.id)}
                       className="inline-flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-[11px] text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
-                      title="إعادة المهمة للمهام الحالية"
                     >
                       <RotateCcw className="size-3" />
-                      إعادة فتح
+                      {isAr ? 'إعادة فتح' : 'Reopen'}
                     </button>
                   </div>
                 </Panel>
@@ -425,12 +578,14 @@ function Tasks() {
 
 function Directory() {
   const { members } = useSystem()
+  const { language } = useLanguage()
+  const isAr = language === 'ar'
 
   return (
-    <div>
+    <div className="text-start rtl:text-right">
       <SectionTitle
-        title="دليل أفراد الفريق"
-        subtitle={`${members.length} عضواً مسجلاً بالفريق حتى الآن.`}
+        title={isAr ? 'دليل أفراد الفريق' : 'Team Members Directory'}
+        subtitle={isAr ? `${members.length} عضواً مسجلاً بالفريق حتى الآن.` : `${members.length} registered team members so far.`}
       />
       <div className="grid gap-3 sm:grid-cols-2">
         {members.map((m) => (
@@ -451,6 +606,8 @@ function Directory() {
 
 function Profile() {
   const { requestPromotion, promotionRequests } = useSystem()
+  const { language } = useLanguage()
+  const isAr = language === 'ar'
   const memberProfile = useMemberProfile()
   const [showModal, setShowModal] = useState(false)
   const [department, setDepartment] = useState('')
@@ -470,19 +627,22 @@ function Profile() {
   }
 
   const roleLabel =
-    memberProfile?.role === 'leader' ? 'قائد الفريق' :
-    memberProfile?.role === 'assistant' ? 'مساعد الأدمن' :
-    'عضو بالفريق'
+    memberProfile?.role === 'leader' ? (isAr ? 'قائد الفريق' : 'Team Leader') :
+    memberProfile?.role === 'assistant' ? (isAr ? 'مساعد الأدمن' : 'Vice Leader') :
+    (isAr ? 'عضو بالفريق' : 'Team Member')
 
   const rows = memberProfile ? [
-    { label: 'الفريق الحالي', value: memberProfile.clubName },
-    { label: 'الصفة بالفريق', value: roleLabel },
-    { label: 'عضو منذ', value: memberProfile.joinedAt },
+    { label: isAr ? 'الفريق الحالي' : 'Current Team', value: memberProfile.clubName },
+    { label: isAr ? 'الصفة بالفريق' : 'Role in Team', value: roleLabel },
+    { label: isAr ? 'عضو منذ' : 'Member Since', value: memberProfile.joinedAt },
   ] : []
 
   return (
-    <div className="space-y-6">
-      <SectionTitle title="الملف الشخصي وصلاحيات العضو" subtitle="إدارة بياناتك وطلب الترقي لمساعد الأدمن." />
+    <div className="space-y-6 text-start rtl:text-right">
+      <SectionTitle
+        title={isAr ? 'الملف الشخصي وصلاحيات العضو' : 'Profile & Member Permissions'}
+        subtitle={isAr ? 'إدارة بياناتك وطلب الترقي لمساعد الأدمن.' : 'Manage your details and request promotion to Vice Leader.'}
+      />
       
       {/* Promotion Request Banner */}
       <Panel className="border-chart-4/40 bg-gradient-to-r from-chart-4/10 via-background to-chart-4/5 p-6">
@@ -490,16 +650,22 @@ function Profile() {
           <div className="space-y-1">
             <div className="flex items-center gap-2 text-chart-4 font-bold text-sm">
               <ShieldCheck className="size-5" />
-              مسار الترقية إلى مساعد ليدر (Vice Leader)
+              {isAr ? 'مسار الترقية إلى مساعد ليدر (Vice Leader)' : 'Promotion Path to Vice Leader'}
             </div>
             <p className="text-xs text-muted-foreground max-w-lg">
-              يمكن للعضو في التيم تقديم طلب ترقية لمساعد الأدمن لإدارة التوظيف والعمليات التشغيلية. يتلقى أدمن الفريق الطلب للموافقة عليه.
+              {isAr
+                ? 'يمكن للعضو في التيم تقديم طلب ترقية لمساعد الأدمن لإدارة التوظيف والعمليات التشغيلية. يتلقى أدمن الفريق الطلب للموافقة عليه.'
+                : 'Team members can apply for promotion to Vice Leader to manage recruitment and operations. Leaders review and approve requests.'}
             </p>
           </div>
 
           {activeReq ? (
             <div className="rounded-xl border border-chart-4/30 bg-chart-4/15 px-4 py-2 text-xs font-bold text-chart-4">
-              {activeReq.status === 'Pending' ? '⏳ طلب الترقية لمساعد قيد مراجعة الأدمن' : activeReq.status === 'Approved' ? '🎉 تمت ترقيتك لمساعد بنجاح!' : 'مرفوض'}
+              {activeReq.status === 'Pending'
+                ? (isAr ? '⏳ طلب الترقية لمساعد قيد مراجعة الأدمن' : '⏳ Promotion request is under Admin review')
+                : activeReq.status === 'Approved'
+                  ? (isAr ? '🎉 تمت ترقيتك لمساعد بنجاح!' : '🎉 Promoted to Vice Leader successfully!')
+                  : (isAr ? 'مرفوض' : 'Rejected')}
             </div>
           ) : (
             <button
@@ -507,7 +673,7 @@ function Profile() {
               className="inline-flex items-center gap-2 rounded-xl bg-chart-4 px-4 py-2.5 text-xs font-bold text-chart-4-foreground hover:scale-105 transition-transform shrink-0 shadow-lg"
             >
               <Sparkles className="size-4" />
-              تقديم طلب ترقية لمساعد
+              {isAr ? 'تقديم طلب ترقية لمساعد' : 'Apply for Vice Leader Promotion'}
             </button>
           )}
         </div>
@@ -547,12 +713,12 @@ function Profile() {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="w-full max-w-md rounded-2xl border border-border bg-background p-6 shadow-2xl space-y-4"
+              className="w-full max-w-md rounded-2xl border border-border bg-background p-6 shadow-2xl space-y-4 text-start rtl:text-right"
             >
               <div className="flex items-center justify-between">
                 <h3 className="font-display text-lg font-bold flex items-center gap-2 text-chart-4">
                   <ShieldCheck className="size-5" />
-                  طلب ترقية إلى مساعد الليدر
+                  {isAr ? 'طلب ترقية إلى مساعد الليدر' : 'Request Vice Leader Promotion'}
                 </h3>
                 <button onClick={() => setShowModal(false)} className="text-muted-foreground hover:text-foreground">
                   <X className="size-5" />
@@ -561,18 +727,22 @@ function Profile() {
 
               <form onSubmit={handleApplyPromotion} className="space-y-4">
                 <div>
-                  <label className="text-xs font-medium text-muted-foreground">القسم التخصصي المُراد إدارته</label>
+                  <label className="text-xs font-medium text-muted-foreground">
+                    {isAr ? 'القسم التخصصي المُراد إدارته' : 'Department to Manage'}
+                  </label>
                   <input
                     required
                     value={department}
                     onChange={(e) => setDepartment(e.target.value)}
-                    placeholder="مثال: Machine Learning / Recruitment"
+                    placeholder="e.g. Machine Learning / Recruitment"
                     className="mt-1 w-full rounded-xl border border-input bg-secondary/30 px-3 py-2 text-sm outline-none focus:border-chart-4"
                   />
                 </div>
 
                 <div>
-                  <label className="text-xs font-medium text-muted-foreground">رقم التليفون (واتساب)</label>
+                  <label className="text-xs font-medium text-muted-foreground">
+                    {isAr ? 'رقم التليفون (واتساب)' : 'WhatsApp Phone Number'}
+                  </label>
                   <input
                     required
                     type="tel"
@@ -584,7 +754,9 @@ function Profile() {
                 </div>
 
                 <div>
-                  <label className="text-xs font-medium text-muted-foreground">رابط الـ CV / Portfolio</label>
+                  <label className="text-xs font-medium text-muted-foreground">
+                    {isAr ? 'رابط الـ CV / Portfolio' : 'CV / Portfolio Link'}
+                  </label>
                   <input
                     required
                     type="url"
@@ -596,13 +768,15 @@ function Profile() {
                 </div>
 
                 <div>
-                  <label className="text-xs font-medium text-muted-foreground">سبب وسابقة أعمالك المؤهلة للترقية</label>
+                  <label className="text-xs font-medium text-muted-foreground">
+                    {isAr ? 'سبب وسابقة أعمالك المؤهلة للترقية' : 'Qualifications & Reason for Promotion'}
+                  </label>
                   <textarea
                     required
                     rows={4}
                     value={reason}
                     onChange={(e) => setReason(e.target.value)}
-                    placeholder="اكتب بالتفصيل إنجازاتك بالفريق ولماذا ترغب في أن تصبح مساعداً لإدارة عمليات التوظيف..."
+                    placeholder={isAr ? 'اكتب بالتفصيل إنجازاتك بالفريق ولماذا ترغب في أن تصبح مساعداً...' : 'Detail your achievements and why you want to become a Vice Leader...'}
                     className="mt-1 w-full rounded-xl border border-input bg-secondary/30 px-3 py-2 text-sm outline-none focus:border-chart-4 resize-none"
                   />
                 </div>
@@ -613,13 +787,13 @@ function Profile() {
                     onClick={() => setShowModal(false)}
                     className="rounded-xl border border-border px-4 py-2 text-sm font-medium hover:bg-secondary"
                   >
-                    إلغاء
+                    {isAr ? 'إلغاء' : 'Cancel'}
                   </button>
                   <button
                     type="submit"
                     className="rounded-xl bg-chart-4 px-4 py-2 text-sm font-bold text-chart-4-foreground hover:scale-105 transition-transform"
                   >
-                    إرسال الطلب للليدر
+                    {isAr ? 'إرسال الطلب للليدر' : 'Submit to Leader'}
                   </button>
                 </div>
               </form>
@@ -633,12 +807,14 @@ function Profile() {
 
 export function MemberWorkspace() {
   const memberProfile = useMemberProfile()
+  const { language } = useLanguage()
+  const isAr = language === 'ar'
 
   const tabs: DashboardTab[] = [
-    { id: 'announcements', label: 'Announcements', icon: Bell, render: () => <Announcements /> },
-    { id: 'calendar', label: 'Calendar', icon: CalendarDays, render: () => <Calendar /> },
-    { id: 'tasks', label: 'My Tasks', icon: ListTodo, render: () => <Tasks /> },
-    { id: 'profile', label: 'Profile & Promotion', icon: UserCircle, render: () => <Profile /> },
+    { id: 'announcements', label: isAr ? 'الإعلانات' : 'Announcements', icon: Bell, render: () => <Announcements /> },
+    { id: 'calendar', label: isAr ? 'التقويم' : 'Calendar', icon: CalendarDays, render: () => <Calendar /> },
+    { id: 'tasks', label: isAr ? 'مهامي' : 'My Tasks', icon: ListTodo, render: () => <Tasks /> },
+    { id: 'profile', label: isAr ? 'الملف الشخصي والترقية' : 'Profile & Promotion', icon: UserCircle, render: () => <Profile /> },
   ]
 
   return (
@@ -655,7 +831,7 @@ export function MemberWorkspace() {
               {memberProfile?.name ?? '...'}
             </p>
             <p className="truncate text-xs text-muted-foreground">
-              حساب عضو في الفريق
+              {isAr ? 'حساب عضو في الفريق' : 'Team Member Account'}
             </p>
           </div>
         </div>

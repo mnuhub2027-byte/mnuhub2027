@@ -1,21 +1,25 @@
 'use client'
 
 import { useRole, roleMeta, roleOrder } from './role-context'
+import { useLanguage } from '@/lib/i18n/LanguageContext'
 import { motion } from 'framer-motion'
 import { cn } from '@/lib/utils'
 
 export function RoleSwitcher() {
   const { role, setRole } = useRole()
+  const { language } = useLanguage()
 
   return (
     <div className="sticky top-0 z-[60] flex w-full flex-col items-center justify-center border-b border-border/50 bg-background/80 px-4 py-2 backdrop-blur-md sm:flex-row sm:gap-4">
       <span className="mb-2 text-xs font-medium text-muted-foreground sm:mb-0">
-        Demo Persona:
+        {language === 'ar' ? 'تبديل الدور التجريبي:' : 'Demo Persona:'}
       </span>
       <div className="flex flex-wrap items-center justify-center gap-1">
         {roleOrder.map((r) => {
           const meta = roleMeta[r]
           const isActive = role === r
+          const label = language === 'ar' ? meta.arabic : meta.label
+
           return (
             <button
               key={r}
@@ -33,7 +37,7 @@ export function RoleSwitcher() {
                 />
               )}
               <meta.icon className={cn("relative z-10 size-3.5", isActive ? meta.accent : '')} />
-              <span className="relative z-10">{meta.label}</span>
+              <span className="relative z-10">{label}</span>
             </button>
           )
         })}

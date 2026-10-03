@@ -5,13 +5,16 @@ import { clubs, type Category, type Club } from '@/lib/data'
 import { SiteHeader } from '@/components/site-header'
 import { Hero } from '@/components/hero'
 import { ClubDirectory } from '@/components/club-directory'
-import { ClubDetailsModal } from '@/components/club-details-modal'
 import { Dashboard } from '@/components/dashboard'
 import { SiteFooter } from '@/components/site-footer'
-
 import { PublicFeed } from '@/components/public-feed'
-
 import { useSystem } from '@/lib/system-context'
+import dynamic from 'next/dynamic'
+
+const ClubDetailsModal = dynamic(
+  () => import('@/components/club-details-modal').then((m) => m.ClubDetailsModal),
+  { ssr: false }
+)
 
 export default function Page() {
   const { clubs } = useSystem()
@@ -59,7 +62,7 @@ export default function Page() {
 
       <SiteFooter />
 
-      <ClubDetailsModal club={selected} onClose={() => setSelected(null)} />
+      {selected && <ClubDetailsModal club={selected} onClose={() => setSelected(null)} />}
     </main>
   )
 }

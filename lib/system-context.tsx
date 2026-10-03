@@ -36,11 +36,28 @@ export type PromotionRequest = {
   reason: string
 }
 
+export type SystemNotification = {
+  id: string
+  title: string
+  body: string
+  timestamp: string
+  read: boolean
+  type: 'application' | 'approval' | 'task' | 'event' | 'system'
+  link?: string
+}
+
 type SystemContextType = {
   // Current active club scoping
   currentClubId: string | null
   setCurrentClubId: (id: string | null) => void
   loadClubData: (clubId: string) => Promise<void>
+
+  // Notification Center System
+  notifications: SystemNotification[]
+  unreadNotificationsCount: number
+  markNotificationAsRead: (id: string) => void
+  markAllNotificationsAsRead: () => void
+  sendNotification: (title: string, body: string, type: SystemNotification['type'], link?: string) => void
 
   // Clubs / Teams (Faculty Control)
   clubs: Club[]
@@ -65,6 +82,7 @@ type SystemContextType = {
     faculty?: string,
     fullName?: string
   ) => Promise<void> | void
+  withdrawApplication: (applicationId: string) => void
 
   // Pipeline Applicants (Assistant View)
   applicants: Applicant[]
@@ -113,6 +131,79 @@ export function SystemProvider({ children }: { children: ReactNode }) {
   const [interviews, setInterviews] = useState<Interview[]>([])
   
   const [currentClubId, setCurrentClubId] = useState<string | null>(null)
+  const [notifications, setNotifications] = useState<SystemNotification[]>([
+    {
+      id: 'n1',
+      title: 'مرحباً بك في منصة MNUHub 🎉',
+      body: 'تم تفعيل حسابك بنجاح. تصفح أندية جامعة المنصورة الأهلية وقدم طلبات الانضمام.',
+      timestamp: 'الآن',
+      read: false,
+      type: 'system',
+    },
+    {
+      id: 'n2',
+      title: 'تحديث جديد في الجدول الأكاديمي',
+      body: 'تم نشر فعاليات وورش العمل الجديدة لهذا الأسبوع في الفيد الجامعي.',
+      timestamp: 'منذ ساعتين',
+      read: false,
+      type: 'event',
+      link: '#events',
+    },
+  ])
+
+  useEffect(() => {
+    try {
+      const savedReadIds = localStorage.getItem('mnuhub_read_notifications')
+      if (savedReadIds) {
+        const readSet = new Set(JSON.parse(savedReadIds))
+        setNotifications((prev) =>
+          prev.map((n) => (readSet.has(n.id) ? { ...n, read: true } : n))
+        )
+      }
+    } catch (e) {}
+  }, [])
+
+  const unreadNotificationsCount = notifications.filter((n) => !n.read).length
+
+  const sendNotification = (
+    title: string,
+    body: string,
+    type: SystemNotification['type'],
+    link?: string
+  ) => {
+    const newNotif: SystemNotification = {
+      id: 'notif-' + Date.now(),
+      title,
+      body,
+      timestamp: 'الآن',
+      read: false,
+      type,
+      link,
+    }
+    setNotifications((prev) => [newNotif, ...prev])
+  }
+
+  const markNotificationAsRead = (id: string) => {
+    setNotifications((prev) => {
+      const updated = prev.map((n) => (n.id === id ? { ...n, read: true } : n))
+      try {
+        const readIds = updated.filter((n) => n.read).map((n) => n.id)
+        localStorage.setItem('mnuhub_read_notifications', JSON.stringify(readIds))
+      } catch (e) {}
+      return updated
+    })
+  }
+
+  const markAllNotificationsAsRead = () => {
+    setNotifications((prev) => {
+      const updated = prev.map((n) => ({ ...n, read: true }))
+      try {
+        const readIds = updated.map((n) => n.id)
+        localStorage.setItem('mnuhub_read_notifications', JSON.stringify(readIds))
+      } catch (e) {}
+      return updated
+    })
+  }
 
   const supabase = createClient()
 
@@ -584,6 +675,14 @@ export function SystemProvider({ children }: { children: ReactNode }) {
     toast.success('تم إرسال طلب الانضمام إلى ' + clubName + ' بنجاح!')
   }
 
+  const withdrawApplication = async (applicationId: string) => {
+    setStudentApplications((prev) => prev.filter((a) => a.id !== applicationId))
+    try {
+      await supabase.from('club_members').delete().eq('id', applicationId)
+    } catch (e) {}
+    toast.success('تم سحب طلب الانضمام بنجاح')
+  }
+
   // Assistant: Advance stage
   const advanceApplicantStage = (id: string) => {
     setApplicants((prev) =>
@@ -621,6 +720,9 @@ export function SystemProvider({ children }: { children: ReactNode }) {
     toast.success(`تم قبول ${target.name} رسمياً بالفريق وتم الحفظ بنجاح! 👑`)
 
     setApplicants((prev) => prev.filter((a) => a.id !== applicantId))
+    setStudentApplications((prev) =>
+      prev.map((app) => (app.id === applicantId ? { ...app, status: 'Accepted', note: 'تهانينا! تم قبولك رسمياً في الفريق 🎉' } : app))
+    )
 
     const initials = target.name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2) || 'ST'
     setMembers((prev) => [
@@ -642,6 +744,7 @@ export function SystemProvider({ children }: { children: ReactNode }) {
   const rejectApplicant = async (applicantId: string) => {
     await supabase.from('club_members').update({ status: 'rejected' }).eq('id', applicantId)
     setApplicants((prev) => prev.filter((a) => a.id !== applicantId))
+    setStudentApplications((prev) => prev.filter((app) => app.id !== applicantId))
     toast.info('Application rejected')
   }
 
@@ -1044,6 +1147,11 @@ export function SystemProvider({ children }: { children: ReactNode }) {
         currentClubId,
         setCurrentClubId,
         loadClubData,
+        notifications,
+        unreadNotificationsCount,
+        markNotificationAsRead,
+        markAllNotificationsAsRead,
+        sendNotification,
         clubs,
         addClub,
         deleteClub,
@@ -1052,6 +1160,7 @@ export function SystemProvider({ children }: { children: ReactNode }) {
         removeAdmin,
         studentApplications,
         applyToClub,
+        withdrawApplication,
         applicants,
         advanceApplicantStage,
         acceptApplicantToTeam,

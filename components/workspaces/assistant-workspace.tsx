@@ -27,11 +27,14 @@ import {
   ChevronDown,
   ChevronUp,
   RotateCcw,
+  Star,
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { pipelineStages, type Applicant } from '@/lib/data'
 import { useSystem } from '@/lib/system-context'
+import { useLanguage } from '@/lib/i18n/LanguageContext'
+import { sanitizeUrl } from '@/lib/security'
 import { StatusBadge } from '@/components/status-badge'
 import {
   DashboardShell,
@@ -49,14 +52,20 @@ const stageColor: Record<string, string> = {
 
 function Pipeline() {
   const { applicants, advanceApplicantStage, acceptApplicantToTeam, rejectApplicant } = useSystem()
+  const { language } = useLanguage()
+  const isAr = language === 'ar'
   const [notes, setNotes] = useState<Record<string, string>>({})
   const [openNote, setOpenNote] = useState<string | null>(null)
 
   return (
-    <div>
+    <div className="text-start rtl:text-right">
       <SectionTitle
-        title="عمليات القبول والتوظيف (المساعدين)"
-        subtitle="مراجعة طلبات اليوزر العادي، المقابلات، وقبولهم رسمياً كـ أثر في الفريق."
+        title={isAr ? 'عمليات القبول والتوظيف (المساعدين)' : 'Recruitment Pipeline (Admins)'}
+        subtitle={
+          isAr
+            ? 'مراجعة طلبات اليوزر العادي، المقابلات، وقبولهم رسمياً كـ أثر في الفريق.'
+            : 'Review student applications, manage interviews, and accept members to the team.'
+        }
       />
       <div className="grid gap-4 md:grid-cols-3">
         {pipelineStages.map((stage) => {
@@ -68,7 +77,11 @@ function Pipeline() {
             >
               <div className="mb-3 flex items-center justify-between">
                 <span className={`text-sm font-semibold ${stageColor[stage]}`}>
-                  {stage === 'Reviewing' ? 'قيد المراجعة' : stage === 'Interview' ? 'مقابلة شخصية' : 'مقبول بالفريق'}
+                  {stage === 'Reviewing'
+                    ? (isAr ? 'قيد المراجعة' : 'Pending Review')
+                    : stage === 'Interview'
+                      ? (isAr ? 'مقابلة شخصية' : 'Interview')
+                      : (isAr ? 'مقبول بالفريق' : 'Accepted')}
                 </span>
                 <span className="rounded-full bg-secondary px-2.5 py-0.5 text-xs font-semibold text-muted-foreground">
                   {col.length}
@@ -85,7 +98,7 @@ function Pipeline() {
                       exit={{ opacity: 0, scale: 0.95 }}
                       className="rounded-xl border border-border glass p-3 space-y-2"
                     >
-                      {/* Header: Name */}
+                      {/* Header: Name & Star Rating */}
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-2">
                           <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-bold text-primary">
@@ -93,70 +106,89 @@ function Pipeline() {
                           </span>
                           <p className="text-sm font-semibold text-foreground">{a.name}</p>
                         </div>
+                        {/* 5-star Rating */}
+                        <div className="flex items-center gap-0.5">
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <button
+                              key={star}
+                              type="button"
+                              onClick={() => setNotes((prev) => ({ ...prev, [`rate-${a.id}`]: String(star) }))}
+                              className="p-0.5 hover:scale-110 transition-transform"
+                            >
+                              <Star
+                                className={`size-3.5 ${
+                                  star <= Number(notes[`rate-${a.id}`] || 0)
+                                    ? 'fill-gold text-gold'
+                                    : 'text-muted-foreground/40'
+                                }`}
+                              />
+                            </button>
+                          ))}
+                        </div>
                       </div>
 
                       {/* Details */}
                       <div className="space-y-1 rounded-lg bg-secondary/30 p-2 text-[11px]">
                         {/* Faculty */}
                         <div className="flex items-center gap-2">
-                          <span className="w-16 shrink-0 text-muted-foreground">الكلية</span>
-                          <span className="font-medium text-foreground">{a.faculty || 'غير محدد'}</span>
+                          <span className="w-16 shrink-0 text-muted-foreground">{isAr ? 'الكلية' : 'Faculty'}</span>
+                          <span className="font-medium text-foreground">{a.faculty || (isAr ? 'غير محدد' : 'N/A')}</span>
                         </div>
                         {/* Role applied for */}
                         <div className="flex items-center gap-2">
-                          <span className="w-16 shrink-0 text-muted-foreground">التخصص</span>
-                          <span className="font-medium text-foreground">{a.role || 'عضو'}</span>
+                          <span className="w-16 shrink-0 text-muted-foreground">{isAr ? 'التخصص' : 'Role'}</span>
+                          <span className="font-medium text-foreground">{a.role || (isAr ? 'عضو' : 'Member')}</span>
                         </div>
                         {/* Email */}
                         {a.email && (
                           <div className="flex items-center gap-2">
-                            <span className="w-16 shrink-0 text-muted-foreground">الإيميل</span>
+                            <span className="w-16 shrink-0 text-muted-foreground">{isAr ? 'الإيميل' : 'Email'}</span>
                             <span className="font-medium text-foreground font-sans truncate">{a.email}</span>
                           </div>
                         )}
                         {/* WhatsApp */}
                         {a.whatsapp && (
                           <div className="flex items-center gap-2">
-                            <span className="w-16 shrink-0 text-muted-foreground">واتساب</span>
+                            <span className="w-16 shrink-0 text-muted-foreground">{isAr ? 'واتساب' : 'WhatsApp'}</span>
                             <span className="font-medium text-foreground font-sans">{a.whatsapp}</span>
                           </div>
                         )}
                         {/* Student ID */}
                         {a.studentId && (
                           <div className="flex items-center gap-2">
-                            <span className="w-16 shrink-0 text-muted-foreground">رقم الطالب</span>
+                            <span className="w-16 shrink-0 text-muted-foreground">{isAr ? 'رقم الطالب' : 'Student ID'}</span>
                             <span className="font-medium text-foreground font-sans">{a.studentId}</span>
                           </div>
                         )}
                         {/* Submitted at */}
                         {a.submittedAt && (
                           <div className="flex items-center gap-2">
-                            <span className="w-16 shrink-0 text-muted-foreground">تاريخ التقديم</span>
+                            <span className="w-16 shrink-0 text-muted-foreground">{isAr ? 'تاريخ التقديم' : 'Applied'}</span>
                             <span className="font-medium text-foreground">{a.submittedAt}</span>
                           </div>
                         )}
                         {/* CV / Portfolio Link */}
                         <div className="flex items-center gap-2 pt-1 border-t border-border/30">
-                          <span className="w-16 shrink-0 text-muted-foreground">الـ CV</span>
+                          <span className="w-16 shrink-0 text-muted-foreground">{isAr ? 'الـ CV' : 'CV'}</span>
                           {a.cvLink || a.portfolio ? (
                             <a
-                              href={a.cvLink || a.portfolio}
+                              href={sanitizeUrl(a.cvLink || a.portfolio)}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="inline-flex items-center gap-1.5 rounded-lg bg-primary/10 border border-primary/20 px-2 py-1 text-xs font-semibold text-primary transition-colors hover:bg-primary/20"
                             >
                               <FileText className="size-3.5" />
-                              عرض ملف الـ CV
+                              {isAr ? 'عرض ملف الـ CV' : 'View CV Link'}
                               <ExternalLink className="size-3" />
                             </a>
                           ) : (
-                            <span className="text-muted-foreground/60 italic">لم يتم إرفاق رابط CV</span>
+                            <span className="text-muted-foreground/60 italic">{isAr ? 'لم يتم إرفاق رابط CV' : 'No CV attached'}</span>
                           )}
                         </div>
                         {/* Motivation / Reason */}
                         {a.motivation && (
                           <div className="flex items-start gap-2 pt-1">
-                            <span className="w-16 shrink-0 text-muted-foreground">الدافع</span>
+                            <span className="w-16 shrink-0 text-muted-foreground">{isAr ? 'الدافع' : 'Motivation'}</span>
                             <span className="font-medium text-foreground/90 leading-tight">{a.motivation}</span>
                           </div>
                         )}
@@ -171,8 +203,8 @@ function Pipeline() {
                             setNotes((n) => ({ ...n, [a.id]: e.target.value }))
                           }
                           onBlur={() => setOpenNote(null)}
-                          placeholder="ملاحظات المساعد التقييمية…"
-                          className="w-full resize-none rounded-lg border border-input bg-background/60 p-2 text-xs outline-none focus:border-primary"
+                          placeholder={isAr ? 'ملاحظات المساعد التقييمية…' : 'Admin assessment notes...'}
+                          className="w-full resize-none rounded-lg border border-input bg-background/60 p-2 text-xs outline-none focus:border-primary text-start rtl:text-right"
                           rows={2}
                         />
                       ) : notes[a.id] ? (
@@ -187,7 +219,7 @@ function Pipeline() {
                           onClick={() => setOpenNote(a.id)}
                           className="rounded-md border border-border px-2 py-1 text-[11px] font-medium text-muted-foreground hover:text-foreground"
                         >
-                          ملاحظة
+                          {isAr ? 'ملاحظة' : 'Note'}
                         </button>
 
                         <div className="flex items-center gap-1">
@@ -199,15 +231,15 @@ function Pipeline() {
                                 title="رفض الطلب"
                               >
                                 <X className="size-3" />
-                                رفض
+                                {isAr ? 'رفض' : 'Reject'}
                               </button>
                               <button
                                 onClick={() => advanceApplicantStage(a.id)}
                                 className="inline-flex items-center gap-1 rounded-md bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-1 text-[11px] font-semibold hover:bg-emerald-500/30 transition-colors"
                                 title="ترقية مرحلة الطلب"
                               >
-                                المتابعة
-                                <ChevronRight className="size-3" />
+                                {isAr ? 'المتابعة' : 'Advance'}
+                                <ChevronRight className="size-3 rtl:rotate-180" />
                               </button>
                               <button
                                 onClick={() => acceptApplicantToTeam(a.id)}
@@ -215,12 +247,12 @@ function Pipeline() {
                                 title="قبول الطالب رسمياً في التيم"
                               >
                                 <UserCheck className="size-3" />
-                                قبول في التيم
+                                {isAr ? 'قبول في التيم' : 'Accept'}
                               </button>
                             </>
                           ) : (
                             <span className="inline-flex items-center gap-1 rounded-md bg-chart-3/20 px-2 py-1 text-[11px] font-bold text-chart-3">
-                              <Check className="size-3" /> تم الانضمام للفريق
+                              <Check className="size-3" /> {isAr ? 'تم الانضمام للفريق' : 'Joined Team'}
                             </span>
                           )}
                         </div>
@@ -231,7 +263,7 @@ function Pipeline() {
 
                 {col.length === 0 && (
                   <p className="py-4 text-center text-xs text-muted-foreground">
-                    لا يوجد متقدمون في هذه المرحلة
+                    {isAr ? 'لا يوجد متقدمون في هذه المرحلة' : 'No applicants in this stage'}
                   </p>
                 )}
               </div>
@@ -1178,12 +1210,14 @@ function useMyClub() {
 
 export function AssistantWorkspace() {
   const myClub = useMyClub()
+  const { language } = useLanguage()
+  const isAr = language === 'ar'
 
   const tabs: DashboardTab[] = [
-    { id: 'pipeline', label: 'Recruitment Pipeline', icon: KanbanSquare, render: () => <Pipeline /> },
-    { id: 'attendance', label: 'Attendance', icon: ClipboardCheck, render: () => <Attendance /> },
-    { id: 'tasks', label: 'Team Tasks', icon: ListTodo, render: () => <TasksManager /> },
-    { id: 'announcements', label: 'Announcements', icon: Megaphone, render: () => <AnnouncementsManager /> },
+    { id: 'pipeline', label: isAr ? 'خطوات التوظيف' : 'Recruitment Pipeline', icon: KanbanSquare, render: () => <Pipeline /> },
+    { id: 'attendance', label: isAr ? 'متابعة الحضور' : 'Attendance', icon: ClipboardCheck, render: () => <Attendance /> },
+    { id: 'tasks', label: isAr ? 'مهام الفريق' : 'Team Tasks', icon: ListTodo, render: () => <TasksManager /> },
+    { id: 'announcements', label: isAr ? 'الإعلانات والأنشطة' : 'Announcements', icon: Megaphone, render: () => <AnnouncementsManager /> },
   ]
 
   return (
@@ -1191,13 +1225,13 @@ export function AssistantWorkspace() {
       tabs={tabs}
       accent="text-chart-4"
       sidebarHeader={
-        <div>
+        <div className="text-start rtl:text-right">
           <p className="text-xs uppercase tracking-wide text-muted-foreground">
-            {myClub?.name || 'إدارة العمليات والتوظيف'}
+            {myClub?.name || (isAr ? 'إدارة العمليات والتوظيف' : 'Operations & Recruitment')}
           </p>
           <p className="mt-1 flex items-center gap-1.5 text-sm font-bold text-chart-4">
             <Check className="size-4" />
-            حساب أدمن الفريق (Vice Leader)
+            {isAr ? 'حساب أدمن الفريق (Vice Leader)' : 'Team Admin (Vice Leader)'}
           </p>
         </div>
       }

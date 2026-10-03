@@ -45,6 +45,7 @@ import {
   type TeamRole,
 } from '@/lib/data'
 import { useSystem } from '@/lib/system-context'
+import { useLanguage } from '@/lib/i18n/LanguageContext'
 import { toast } from 'sonner'
 import { StatusBadge } from '@/components/status-badge'
 import {
@@ -57,30 +58,54 @@ import {
 
 function Analytics() {
   const { members, applicants, teamEvents } = useSystem()
-  
+  const { language } = useLanguage()
+  const isAr = language === 'ar'
+
   const totalApplied = applicants.length + members.length
   const activeMembersCount = members.length
   const acceptanceRate = totalApplied > 0 ? Math.round((activeMembersCount / totalApplied) * 100) : 0
-  const avgAttendance = members.length > 0 
-    ? Math.round(members.reduce((acc, m) => acc + (m.attendance || 100), 0) / members.length)
-    : 0
 
   const stats = [
-    { label: 'إجمالي المتقدمين', value: totalApplied, icon: Users2, accent: 'text-primary' },
-    { label: 'نسبة القبول بالفريق', value: `${acceptanceRate}%`, icon: Percent, accent: 'text-chart-3' },
-    { label: 'الأعضاء النشطون بالفريق', value: activeMembersCount, icon: TrendingUp, accent: 'text-accent' },
-    { label: 'الأحداث والأنشطة', value: teamEvents.length, icon: GaugeCircle, accent: 'text-chart-4' },
+    { label: isAr ? 'إجمالي المتقدمين' : 'Total Applicants', value: totalApplied, icon: Users2, accent: 'text-primary' },
+    { label: isAr ? 'نسبة القبول بالفريق' : 'Acceptance Rate', value: `${acceptanceRate}%`, icon: Percent, accent: 'text-chart-3' },
+    { label: isAr ? 'الأعضاء النشطون بالفريق' : 'Active Members', value: activeMembersCount, icon: TrendingUp, accent: 'text-accent' },
+    { label: isAr ? 'الأحداث والأنشطة' : 'Events & Programs', value: teamEvents.length, icon: GaugeCircle, accent: 'text-chart-4' },
   ]
 
+  const handleExportCSV = () => {
+    if (members.length === 0) {
+      toast.error(isAr ? 'لا يوجد أعضاء في الكشف لتصديرهم' : 'No team members to export')
+      return
+    }
+    const headers = isAr
+      ? 'الاسم,البريد الإلكتروني,الكلية/القسم,الرتبة,تاريخ الانضمام\n'
+      : 'Name,Email,Department,Role,Joined Date\n'
+    const rows = members
+      .map((m) => `"${m.name}","${m.email || ''}","${m.department}","${m.role}","${m.joined}"`)
+      .join('\n')
+    const blob = new Blob(['\uFEFF' + headers + rows], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.setAttribute('download', `MNUHub_Team_Roster_${Date.now()}.csv`)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    toast.success(isAr ? 'تم تصدير كشف التيم إلى ملف Excel/CSV بنجاح!' : 'Team roster exported to CSV successfully!')
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 text-start rtl:text-right">
       <SectionTitle
-        title="تحليلات وأداء الفريق"
-        subtitle="متابعة الأداء والإحصائيات الخاصة بتيمك بناءً على البيانات الحقيقية."
+        title={isAr ? 'تحليلات وأداء الفريق' : 'Team Analytics & Performance'}
+        subtitle={isAr ? 'متابعة الأداء والإحصائيات الخاصة بتيمك بناءً على البيانات الحقيقية.' : 'Track team stats and performance based on real platform data.'}
         action={
-          <button className="inline-flex items-center gap-2 rounded-xl border border-border bg-background/60 px-3.5 py-2 text-sm font-medium transition-colors hover:bg-secondary">
-            <Download className="size-4" />
-            تصدير التقرير
+          <button
+            onClick={handleExportCSV}
+            className="inline-flex items-center gap-2 rounded-xl border border-border bg-background/60 px-3.5 py-2 text-sm font-medium transition-colors hover:bg-secondary"
+          >
+            <Download className="size-4 text-primary" />
+            {isAr ? 'تصدير التقرير (Excel/CSV)' : 'Export Roster (CSV)'}
           </button>
         }
       />
@@ -91,20 +116,20 @@ function Analytics() {
       </div>
 
       <Panel>
-        <p className="font-medium">نظرة عامة على نشاط الفريق</p>
-        <p className="text-sm text-muted-foreground">ملخص الإحصائيات المسجلة حالياً للتيم في الداتا بيز</p>
+        <p className="font-medium">{isAr ? 'نظرة عامة على نشاط الفريق' : 'Team Activity Overview'}</p>
+        <p className="text-sm text-muted-foreground">{isAr ? 'ملخص الإحصائيات المسجلة حالياً للتيم في الداتا بيز' : 'Summary of active team metrics from the database'}</p>
         <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
           <div className="rounded-xl border border-border bg-secondary/30 p-4">
             <p className="text-2xl font-bold text-primary">{applicants.length}</p>
-            <p className="text-xs text-muted-foreground mt-1">طلبات المتقدمين المعلقة</p>
+            <p className="text-xs text-muted-foreground mt-1">{isAr ? 'طلبات المتقدمين المعلقة' : 'Pending Applications'}</p>
           </div>
           <div className="rounded-xl border border-border bg-secondary/30 p-4">
             <p className="text-2xl font-bold text-accent">{members.length}</p>
-            <p className="text-xs text-muted-foreground mt-1">الأعضاء الحاليين بالفريق</p>
+            <p className="text-xs text-muted-foreground mt-1">{isAr ? 'الأعضاء الحاليين بالفريق' : 'Current Team Members'}</p>
           </div>
           <div className="rounded-xl border border-border bg-secondary/30 p-4">
             <p className="text-2xl font-bold text-chart-4">{teamEvents.length}</p>
-            <p className="text-xs text-muted-foreground mt-1">الفعاليات المنشورة</p>
+            <p className="text-xs text-muted-foreground mt-1">{isAr ? 'الفعاليات المنشورة' : 'Published Events'}</p>
           </div>
         </div>
       </Panel>
@@ -114,6 +139,8 @@ function Analytics() {
 
 function Approvals() {
   const { promotionRequests, approvePromotion, rejectPromotion, promoteAssistantByEmail } = useSystem()
+  const { language } = useLanguage()
+  const isAr = language === 'ar'
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -130,20 +157,20 @@ function Approvals() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 text-start rtl:text-right">
       <SectionTitle
-        title="ترقية الأعضاء والموافقات"
-        subtitle="تعيين أدمن/مساعد للفريق بالبريد، أو المراجعة والموافقة على طلبات ترقية الأعضاء."
+        title={isAr ? 'ترقية الأعضاء والموافقات' : 'Member Promotions & Approvals'}
+        subtitle={isAr ? 'تعيين أدمن/مساعد للفريق بالبريد، أو المراجعة والموافقة على طلبات ترقية الأعضاء.' : 'Assign admins/vice-leaders by email, or review and approve member promotion requests.'}
       />
 
       {/* Direct Email Promotion Panel */}
       <Panel className="border-primary/30 bg-primary/5">
         <h4 className="font-display text-base font-semibold flex items-center gap-2">
           <Crown className="size-5 text-primary" />
-          إضافة أدمن / مساعد للفريق بالبريد الإلكتروني
+          {isAr ? 'إضافة أدمن / مساعد للفريق بالبريد الإلكتروني' : 'Add Admin / Vice Leader by Email'}
         </h4>
         <p className="mt-1 text-xs text-muted-foreground">
-          أدخل البريد الإلكتروني الخاص بالطالب المسجل في المنصة لترقيته فوراً إلى أدمن/مساعد بالفريق (Vice Leader).
+          {isAr ? 'أدخل البريد الإلكتروني الخاص بالطالب المسجل في المنصة لترقيته فوراً إلى أدمن/مساعد بالفريق (Vice Leader).' : 'Enter student email registered on the platform to instantly promote them to Vice Leader.'}
         </p>
 
         <form onSubmit={handlePromoteByEmail} className="mt-4 flex flex-col sm:flex-row gap-3">
@@ -152,8 +179,8 @@ function Approvals() {
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="مثال: student@uni.edu"
-            className="flex-1 rounded-xl border border-input bg-background/80 px-4 py-2.5 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+            placeholder={isAr ? 'مثال: student@uni.edu' : 'e.g. student@uni.edu'}
+            className="flex-1 rounded-xl border border-input bg-background/80 px-4 py-2.5 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary font-sans"
           />
           <button
             type="submit"
@@ -161,7 +188,7 @@ function Approvals() {
             className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground transition-transform hover:scale-[1.02] disabled:opacity-60"
           >
             <ShieldCheck className="size-4" />
-            {loading ? 'جاري الترقية...' : 'ترقية إلى أدمن'}
+            {loading ? (isAr ? 'جاري الترقية...' : 'Promoting...') : (isAr ? 'ترقية إلى أدمن' : 'Promote to Vice Leader')}
           </button>
         </form>
       </Panel>
@@ -169,7 +196,7 @@ function Approvals() {
       <div className="space-y-4">
         <h4 className="font-display text-base font-semibold flex items-center gap-2">
           <ShieldCheck className="size-5 text-chart-4" />
-          طلبات الترقية إلى مساعد (Vice Leader)
+          {isAr ? 'طلبات الترقية إلى مساعد (Vice Leader)' : 'Pending Vice Leader Promotion Requests'}
         </h4>
 
         <div className="space-y-3">
@@ -190,7 +217,7 @@ function Approvals() {
                       </span>
                       <div>
                         <p className="font-medium text-foreground text-sm">{req.memberName}</p>
-                        <p className="text-xs text-muted-foreground">قسم: {req.department} · قدم بتاريخ {req.submittedAt}</p>
+                        <p className="text-xs text-muted-foreground">{isAr ? `قسم: ${req.department} · قدم بتاريخ ${req.submittedAt}` : `Department: ${req.department} · Submitted: ${req.submittedAt}`}</p>
                       </div>
                       <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${
                         req.status === 'Approved'
@@ -199,12 +226,12 @@ function Approvals() {
                           ? 'bg-destructive/20 text-destructive'
                           : 'bg-chart-4/20 text-chart-4'
                       }`}>
-                        {req.status === 'Pending' ? 'طلب ترقية معلق' : req.status === 'Approved' ? 'تمت الترقي لمساعد' : 'مرفوض'}
+                        {req.status === 'Pending' ? (isAr ? 'طلب ترقية معلق' : 'Pending Request') : req.status === 'Approved' ? (isAr ? 'تمت الترقي لمساعد' : 'Approved') : (isAr ? 'مرفوض' : 'Rejected')}
                       </span>
                     </div>
 
                     <p className="mt-2 text-xs text-foreground/80 rounded-lg bg-background/60 p-2.5 border border-border/50">
-                      💬 <span className="font-semibold">سبب طلب الترقية:</span> {req.reason}
+                      💬 <span className="font-semibold">{isAr ? 'سبب طلب الترقية:' : 'Reason:'}</span> {req.reason}
                     </p>
                   </div>
 
@@ -215,19 +242,19 @@ function Approvals() {
                         className="inline-flex items-center gap-1.5 rounded-xl bg-chart-3 px-3.5 py-2 text-xs font-bold text-chart-3-foreground transition-transform hover:scale-105 shadow-md"
                       >
                         <Check className="size-4" />
-                        الموافقة والترقية لمساعد
+                        {isAr ? 'الموافقة والترقية لمساعد' : 'Approve & Promote'}
                       </button>
                       <button
                         onClick={() => rejectPromotion(req.id)}
                         className="inline-flex items-center gap-1.5 rounded-xl bg-secondary px-3 py-2 text-xs font-medium text-muted-foreground hover:bg-destructive/15 hover:text-destructive transition-colors"
                       >
                         <X className="size-4" />
-                        رفض
+                        {isAr ? 'رفض' : 'Reject'}
                       </button>
                     </div>
                   ) : (
                     <div className="text-xs font-semibold text-chart-3 flex items-center gap-1">
-                      <Award className="size-4" /> {req.status === 'Approved' ? 'تمت الترقية لمساعد' : 'تم الرفض'}
+                      <Award className="size-4" /> {req.status === 'Approved' ? (isAr ? 'تمت الترقية لمساعد' : 'Promoted') : (isAr ? 'تم الرفض' : 'Rejected')}
                     </div>
                   )}
                 </Panel>
@@ -237,7 +264,7 @@ function Approvals() {
 
           {promotionRequests.length === 0 && (
             <Panel className="text-center py-8">
-              <p className="text-sm text-muted-foreground">لا توجد طلبات ترقية معلقة حالياً.</p>
+              <p className="text-sm text-muted-foreground">{isAr ? 'لا توجد طلبات ترقية معلقة حالياً.' : 'No pending promotion requests.'}</p>
             </Panel>
           )}
         </div>
@@ -1211,14 +1238,16 @@ function LeaderTasksManager() {
 
 export function LeaderWorkspace() {
   const myClub = useMyClub()
+  const { language } = useLanguage()
+  const isAr = language === 'ar'
 
   const tabs: DashboardTab[] = [
-    { id: 'approvals', label: 'Promotion Approvals', icon: GaugeCircle, render: () => <Approvals /> },
-    { id: 'analytics', label: 'Analytics', icon: BarChart3, render: () => <Analytics /> },
-    { id: 'members', label: 'Member Management', icon: UsersRound, render: () => <MemberManagement /> },
-    { id: 'tasks', label: 'Team Tasks', icon: ListTodo, render: () => <LeaderTasksManager /> },
-    { id: 'events', label: 'Events & Programs', icon: CalendarPlus, render: () => <EventsManager /> },
-    { id: 'settings', label: 'Team Settings', icon: Settings2, render: () => <TeamSettings /> },
+    { id: 'approvals', label: isAr ? 'طلبات ترقية المساعدين' : 'Promotion Approvals', icon: GaugeCircle, render: () => <Approvals /> },
+    { id: 'analytics', label: isAr ? 'التحليلات والأداء' : 'Analytics', icon: BarChart3, render: () => <Analytics /> },
+    { id: 'members', label: isAr ? 'إدارة الأعضاء' : 'Member Management', icon: UsersRound, render: () => <MemberManagement /> },
+    { id: 'tasks', label: isAr ? 'مهام الفريق' : 'Team Tasks', icon: ListTodo, render: () => <LeaderTasksManager /> },
+    { id: 'events', label: isAr ? 'الفعاليات والأحداث' : 'Events & Programs', icon: CalendarPlus, render: () => <EventsManager /> },
+    { id: 'settings', label: isAr ? 'إعدادات الفريق' : 'Team Settings', icon: Settings2, render: () => <TeamSettings /> },
   ]
 
   return (
@@ -1226,13 +1255,13 @@ export function LeaderWorkspace() {
       tabs={tabs}
       accent="text-primary"
       sidebarHeader={
-        <div>
+        <div className="text-start rtl:text-right">
           <p className="text-xs uppercase tracking-wide text-muted-foreground">
-            {myClub?.name || 'الفريق'}
+            {myClub?.name || (isAr ? 'الفريق' : 'Team')}
           </p>
           <p className="mt-1 flex items-center gap-1.5 text-sm font-bold text-primary">
             <Crown className="size-4" />
-            حساب أدمن الفريق (Leader)
+            {isAr ? 'حساب أدمن الفريق (Leader)' : 'Team Leader Account'}
           </p>
         </div>
       }
