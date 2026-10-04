@@ -1,6 +1,9 @@
 import { Resend } from 'resend'
+import nodemailer from 'nodemailer'
 
 const resendApiKey = process.env.RESEND_API_KEY
+const smtpUser = process.env.SMTP_USER || process.env.GMAIL_USER
+const smtpPass = process.env.SMTP_PASS || process.env.GMAIL_PASS
 
 export const resend = resendApiKey ? new Resend(resendApiKey) : null
 
@@ -17,6 +20,32 @@ export async function sendCustomEmail({
   html,
   from = 'MNUHub Admin <onboarding@resend.dev>',
 }: SendEmailParams) {
+  // Option A: If Gmail/SMTP credentials exist, use Nodemailer (sends to ANY email address without domain restriction)
+  if (smtpUser && smtpPass) {
+    try {
+      const transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+          user: smtpUser,
+          pass: smtpPass,
+        },
+      })
+
+      const info = await transporter.sendMail({
+        from: `MNUHub <${smtpUser}>`,
+        to: Array.isArray(to) ? to.join(', ') : to,
+        subject,
+        html,
+      })
+
+      return { success: true, data: info }
+    } catch (smtpErr: any) {
+      console.error('[SMTP Email Error]:', smtpErr)
+      return { success: false, error: smtpErr.message || 'Failed to send email via SMTP' }
+    }
+  }
+
+  // Option B: Fallback to Resend API
   if (!resend) {
     console.warn('[Resend Email] RESEND_API_KEY is not set in environment variables.')
     return { success: false, error: 'RESEND_API_KEY is not configured in .env' }

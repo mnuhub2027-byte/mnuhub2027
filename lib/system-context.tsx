@@ -771,7 +771,13 @@ export function SystemProvider({ children }: { children: ReactNode }) {
     const { data: { session } } = await supabase.auth.getSession()
     if (!session?.user) return
 
-    const { data, error } = await supabase.from('promotion_requests').insert({
+    const { data: existing } = await supabase.from('promotion_requests')
+      .select('id')
+      .eq('user_id', session.user.id)
+      .eq('club_id', currentClubId)
+      .maybeSingle()
+
+    const payload = {
       club_id: currentClubId,
       user_id: session.user.id,
       member_name: memberName,
@@ -779,23 +785,36 @@ export function SystemProvider({ children }: { children: ReactNode }) {
       phone: phone,
       cv_link: cvLink,
       requested_role: 'Vice Leader',
-      reason: reason,
+      reason: `[طلب_ترقية] ${reason}`,
       status: 'Pending'
-    }).select().single()
+    }
+
+    let result
+    if (existing) {
+      result = await supabase.from('promotion_requests').update(payload).eq('id', existing.id).select().single()
+    } else {
+      result = await supabase.from('promotion_requests').insert(payload).select().single()
+    }
+
+    const { data, error } = result
 
     if (error) { toast.error(error.message); return }
 
-    setPromotionRequests((prev) => [{
-      id: data.id,
-      memberName,
-      memberInitials: memberName.substring(0, 2).toUpperCase(),
-      department,
-      requestedRole: 'Vice Leader',
-      submittedAt: new Date(data.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-      status: 'Pending',
-      reason,
-    }, ...prev])
-    toast.success('تم إرسال طلب الترقية للليدر بنجاح!')
+    setPromotionRequests((prev) => {
+      const existingReq = prev.find(r => r.memberName === memberName)
+      const newReq = {
+        id: data.id,
+        memberName,
+        memberInitials: memberName.substring(0, 2).toUpperCase(),
+        department,
+        requestedRole: 'Vice Leader' as const,
+        submittedAt: new Date(data.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+        status: 'Pending' as const,
+        reason,
+      }
+      return existingReq ? prev.map(r => r.memberName === memberName ? newReq : r) : [newReq, ...prev]
+    })
+    toast.success('تم التقديم بنجاح! طلبك الآن قيد المراجعة.')
   }
 
   // Leader: Approve Member Promotion
