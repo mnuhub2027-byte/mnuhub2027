@@ -93,6 +93,7 @@ type SystemContextType = {
   // Members (Member View & Leader View)
   members: Member[]
   updateMemberRole: (memberId: string, role: 'Leader' | 'Vice Leader' | 'Member') => Promise<void>
+  leaveTeam: () => Promise<void>
 
   // Promotion Requests (Member -> Leader Approval)
   promotionRequests: PromotionRequest[]
@@ -765,19 +766,38 @@ export function SystemProvider({ children }: { children: ReactNode }) {
     toast.success(role === 'Member' ? 'تم تخفيض الرتبة إلى عضو بنجاح' : 'تم تحديث رتبة العضو بنجاح')
   }
 
+  // Member: Leave Team
+  const leaveTeam = async () => {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session?.user) { toast.error('يجب تسجيل الدخول أولاً'); return }
+
+    const { error } = await supabase
+      .from('club_members')
+      .delete()
+      .eq('user_id', session.user.id)
+      .eq('status', 'active')
+
+    if (error) { toast.error('فشل مغادرة الفريق: ' + error.message); return }
+
+    // Reset local state
+    setMembers((prev) => prev.filter((m) => m.userId !== session.user.id))
+    setMyTasks([])
+    setAnnouncements([])
+    setTeamEvents([])
+    setCurrentClubId(null)
+
+    toast.success('تمت مغادرة الفريق بنجاح. يمكنك التقديم لفريق آخر.')
+    // Redirect to home
+    window.location.href = '/'
+  }
+
   // Member: Request Promotion
   const requestPromotion = async (memberName: string, department: string, phone: string, cvLink: string, reason: string) => {
     if (!currentClubId) return
     const { data: { session } } = await supabase.auth.getSession()
     if (!session?.user) return
 
-    const { data: existing } = await supabase.from('promotion_requests')
-      .select('id')
-      .eq('user_id', session.user.id)
-      .eq('club_id', currentClubId)
-      .maybeSingle()
-
-    const payload = {
+    const { data, error } = await supabase.from('promotion_requests').insert({
       club_id: currentClubId,
       user_id: session.user.id,
       member_name: memberName,
@@ -785,36 +805,23 @@ export function SystemProvider({ children }: { children: ReactNode }) {
       phone: phone,
       cv_link: cvLink,
       requested_role: 'Vice Leader',
-      reason: `[طلب_ترقية] ${reason}`,
+      reason: reason,
       status: 'Pending'
-    }
-
-    let result
-    if (existing) {
-      result = await supabase.from('promotion_requests').update(payload).eq('id', existing.id).select().single()
-    } else {
-      result = await supabase.from('promotion_requests').insert(payload).select().single()
-    }
-
-    const { data, error } = result
+    }).select().single()
 
     if (error) { toast.error(error.message); return }
 
-    setPromotionRequests((prev) => {
-      const existingReq = prev.find(r => r.memberName === memberName)
-      const newReq = {
-        id: data.id,
-        memberName,
-        memberInitials: memberName.substring(0, 2).toUpperCase(),
-        department,
-        requestedRole: 'Vice Leader' as const,
-        submittedAt: new Date(data.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-        status: 'Pending' as const,
-        reason,
-      }
-      return existingReq ? prev.map(r => r.memberName === memberName ? newReq : r) : [newReq, ...prev]
-    })
-    toast.success('تم التقديم بنجاح! طلبك الآن قيد المراجعة.')
+    setPromotionRequests((prev) => [{
+      id: data.id,
+      memberName,
+      memberInitials: memberName.substring(0, 2).toUpperCase(),
+      department,
+      requestedRole: 'Vice Leader',
+      submittedAt: new Date(data.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+      status: 'Pending',
+      reason,
+    }, ...prev])
+    toast.success('تم إرسال طلب الترقية للليدر بنجاح!')
   }
 
   // Leader: Approve Member Promotion
@@ -1186,6 +1193,7 @@ export function SystemProvider({ children }: { children: ReactNode }) {
         rejectApplicant,
         members,
         updateMemberRole,
+        leaveTeam,
         promotionRequests,
         requestPromotion,
         approvePromotion,

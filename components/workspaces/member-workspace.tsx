@@ -26,6 +26,7 @@ import {
   Users,
   LayoutGrid,
   List,
+  LogOut,
 } from 'lucide-react'
 import { useSystem } from '@/lib/system-context'
 import { createClient } from '@/lib/supabase/client'
@@ -605,11 +606,13 @@ function Directory() {
 }
 
 function Profile() {
-  const { requestPromotion, promotionRequests } = useSystem()
+  const { requestPromotion, promotionRequests, leaveTeam } = useSystem()
   const { language } = useLanguage()
   const isAr = language === 'ar'
   const memberProfile = useMemberProfile()
   const [showModal, setShowModal] = useState(false)
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false)
+  const [isLeaving, setIsLeaving] = useState(false)
   const [department, setDepartment] = useState('')
   const [phone, setPhone] = useState('')
   const [cvLink, setCvLink] = useState('')
@@ -624,6 +627,13 @@ function Profile() {
     if (!reason || !memberProfile) return
     requestPromotion(memberProfile.name, department, phone, cvLink, reason)
     setShowModal(false)
+  }
+
+  const handleLeaveTeam = async () => {
+    setIsLeaving(true)
+    await leaveTeam()
+    setIsLeaving(false)
+    setShowLeaveConfirm(false)
   }
 
   const roleLabel =
@@ -703,7 +713,92 @@ function Profile() {
             </div>
           ))}
         </dl>
+
+        {/* Leave Team Button */}
+        <div className="mt-6 pt-5 border-t border-border/60">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-xs font-semibold text-red-400">
+                {isAr ? '⚠️ مغادرة الفريق' : '⚠️ Leave Team'}
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {isAr
+                  ? 'ستتم إزالتك من الفريق نهائياً ويمكنك التقديم لفريق آخر لاحقاً.'
+                  : 'You will be permanently removed from the team. You can apply to another team later.'}
+              </p>
+            </div>
+            <button
+              onClick={() => setShowLeaveConfirm(true)}
+              className="inline-flex items-center gap-2 rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-2.5 text-xs font-bold text-red-400 hover:bg-red-500/20 transition-colors shrink-0"
+            >
+              <LogOut className="size-4" />
+              {isAr ? 'مغادرة الفريق' : 'Leave Team'}
+            </button>
+          </div>
+        </div>
       </Panel>
+
+      {/* Confirmation Modal: Leave Team */}
+      <AnimatePresence>
+        {showLeaveConfirm && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="w-full max-w-sm rounded-2xl border border-red-500/30 bg-background p-6 shadow-2xl space-y-4 text-start rtl:text-right"
+            >
+              <div className="flex items-center justify-between">
+                <h3 className="font-display text-lg font-bold flex items-center gap-2 text-red-400">
+                  <LogOut className="size-5" />
+                  {isAr ? 'تأكيد مغادرة الفريق' : 'Confirm Leave Team'}
+                </h3>
+                <button onClick={() => setShowLeaveConfirm(false)} className="text-muted-foreground hover:text-foreground">
+                  <X className="size-5" />
+                </button>
+              </div>
+
+              <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-4">
+                <p className="text-sm text-foreground font-medium">
+                  {isAr
+                    ? `هل أنت متأكد أنك تريد مغادرة فريق "${memberProfile?.clubName}"؟`
+                    : `Are you sure you want to leave "${memberProfile?.clubName}"?`}
+                </p>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {isAr
+                    ? 'لن تتمكن من الوصول لبيانات الفريق بعد المغادرة. يمكنك التقديم لفريق آخر من الصفحة الرئيسية.'
+                    : 'You will lose access to all team data. You can apply to another team from the home page.'}
+                </p>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowLeaveConfirm(false)}
+                  className="rounded-xl border border-border px-4 py-2 text-sm font-medium hover:bg-secondary"
+                >
+                  {isAr ? 'إلغاء' : 'Cancel'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleLeaveTeam}
+                  disabled={isLeaving}
+                  className="inline-flex items-center gap-2 rounded-xl bg-red-500 px-4 py-2 text-sm font-bold text-white hover:bg-red-600 transition-colors disabled:opacity-60"
+                >
+                  {isLeaving ? (
+                    <div className="size-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  ) : (
+                    <LogOut className="size-4" />
+                  )}
+                  {isLeaving
+                    ? (isAr ? 'جاري المغادرة...' : 'Leaving...')
+                    : (isAr ? 'نعم، مغادرة الفريق' : 'Yes, Leave Team')}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Modal request promotion */}
       <AnimatePresence>
