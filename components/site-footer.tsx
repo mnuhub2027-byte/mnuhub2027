@@ -66,10 +66,17 @@ export function SiteFooter() {
                   <div className="relative w-full sm:w-80">
                     <Mail className="absolute rtl:right-3 ltr:left-3 top-3 size-4 text-muted-foreground" />
                     <input
-                      type="email"
+                      type="text"
+                      inputMode="email"
+                      autoComplete="email"
                       required
                       value={newsletterEmail}
-                      onChange={(e) => setNewsletterEmail(e.target.value.trim())}
+                      onChange={(e) => setNewsletterEmail(e.target.value.replace(/[^\x20-\x7E]/g, '').trim())}
+                      onPaste={(e) => {
+                        e.preventDefault()
+                        const pasted = e.clipboardData.getData('text').replace(/[^\x20-\x7E]/g, '').trim()
+                        setNewsletterEmail(pasted)
+                      }}
                       placeholder={isAr ? 'أدخل البريد الجامعي الرسمي' : 'Enter official university email'}
                       className="w-full rounded-2xl border border-border bg-background/80 rtl:pr-10 ltr:pl-10 px-3 py-2.5 text-xs sm:text-sm outline-none focus:border-primary transition-all font-sans"
                     />

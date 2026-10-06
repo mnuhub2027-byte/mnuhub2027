@@ -329,9 +329,16 @@ function AdminsManagement() {
                   <label className="text-xs font-medium text-muted-foreground">{isAr ? 'البريد الإلكتروني الجامعي' : 'University Email'}</label>
                   <input
                     required
-                    type="email"
+                    type="text"
+                    inputMode="email"
+                    autoComplete="email"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value.trim())}
+                    onChange={(e) => setEmail(e.target.value.replace(/[^\x20-\x7E]/g, '').trim())}
+                    onPaste={(e) => {
+                      e.preventDefault()
+                      const pasted = e.clipboardData.getData('text').replace(/[^\x20-\x7E]/g, '').trim()
+                      setEmail(pasted)
+                    }}
                     placeholder="admin@mnuh.edu.eg"
                     className="mt-1 w-full rounded-xl border border-input bg-secondary/30 px-3 py-2 text-sm outline-none focus:border-gold font-sans"
                   />

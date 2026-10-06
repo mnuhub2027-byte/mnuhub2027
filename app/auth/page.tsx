@@ -411,8 +411,15 @@ export default function AuthPage() {
                     id="auth-email-input"
                     required
                     value={email}
-                    onChange={(e) => setEmail(e.target.value.trim())}
-                    type="email"
+                    onChange={(e) => setEmail(e.target.value.replace(/[^\x20-\x7E]/g, '').trim())}
+                    onPaste={(e) => {
+                      e.preventDefault()
+                      const pasted = e.clipboardData.getData('text').replace(/[^\x20-\x7E]/g, '').trim()
+                      setEmail(pasted)
+                    }}
+                    type="text"
+                    inputMode="email"
+                    autoComplete="email"
                     placeholder="name@std.mnu.edu.eg"
                     className="w-full rounded-xl border border-border bg-background/50 py-2.5 ltr:pl-10 ltr:pr-4 rtl:pr-10 rtl:pl-4 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary font-sans"
                   />

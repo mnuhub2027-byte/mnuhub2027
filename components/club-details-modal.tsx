@@ -453,9 +453,16 @@ function ApplicationForm({
               </Field>
               <Field label={t('modal.email')}>
                 <input
-                  type="email"
+                  type="text"
+                  inputMode="email"
+                  autoComplete="email"
                   value={form.email}
-                  onChange={(e) => set('email')(e.target.value.trim())}
+                  onChange={(e) => set('email')(e.target.value.replace(/[^\x20-\x7E]/g, '').trim())}
+                  onPaste={(e) => {
+                    e.preventDefault()
+                    const pasted = e.clipboardData.getData('text').replace(/[^\x20-\x7E]/g, '').trim()
+                    set('email')(pasted)
+                  }}
                   placeholder={t('modal.emailPlaceholder')}
                   className={inputClass}
                 />
