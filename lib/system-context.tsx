@@ -448,6 +448,7 @@ export function SystemProvider({ children }: { children: ReactNode }) {
           achievements: [],
           events: [],
           openRoles: ['Member'],
+          status: c.status || 'active',
         }))
         if (mappedClubs.length > 0) setClubs(mappedClubs)
       }
