@@ -16,6 +16,9 @@ import {
   CheckCircle2,
   X,
   Megaphone,
+  PauseCircle,
+  PlayCircle,
+  AlertTriangle,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useSystem } from '@/lib/system-context'
@@ -385,7 +388,7 @@ function AdminsManagement() {
 }
 
 function ClubsManagement() {
-  const { clubs, addClub, deleteClub } = useSystem()
+  const { clubs, addClub, deleteClub, suspendClub } = useSystem()
   const { language } = useLanguage()
   const isAr = language === 'ar'
   const currentFaculties = faculties[language] || faculties.ar
@@ -397,6 +400,7 @@ function ClubsManagement() {
   const [tagline, setTagline] = useState('')
   const [description, setDescription] = useState('')
   const [openRoles, setOpenRoles] = useState('Front-end Developer, UI/UX Designer')
+  const [suspendingId, setSuspendingId] = useState<string | null>(null)
 
   const handleCreateClub = (e: React.FormEvent) => {
     e.preventDefault()
@@ -420,6 +424,12 @@ function ClubsManagement() {
     setShowModal(false)
   }
 
+  const handleSuspend = async (clubId: string) => {
+    setSuspendingId(clubId)
+    await suspendClub(clubId)
+    setSuspendingId(null)
+  }
+
   return (
     <div className="space-y-6 text-start rtl:text-right">
       <SectionTitle
@@ -436,35 +446,87 @@ function ClubsManagement() {
         }
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {clubs.map((c) => (
-          <Panel key={c.id} className="relative flex flex-col justify-between space-y-3">
-            <div>
-              <div className="flex items-start justify-between">
-                <span className="inline-block rounded-full bg-gold/15 px-2.5 py-0.5 text-xs font-semibold text-gold">
-                  {c.category}
-                </span>
-                <button
-                  onClick={() => deleteClub(c.id)}
-                  className="text-muted-foreground hover:text-destructive transition-colors p-1"
-                  title={isAr ? 'حذف التيم' : 'Delete Team'}
-                >
-                  <Trash2 className="size-4" />
-                </button>
-              </div>
-              <h4 className="mt-2 font-display text-lg font-bold">{c.name}</h4>
-              <p className="text-xs text-muted-foreground">{c.faculty} · {c.members} {isAr ? 'عضو' : 'members'}</p>
-              <p className="mt-2 text-xs text-foreground/80 line-clamp-2">{c.description}</p>
-            </div>
+      {/* Suspended Teams Warning */}
+      {clubs.some((c) => c.status === 'suspended') && (
+        <div className="flex items-center gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3">
+          <AlertTriangle className="size-4 text-amber-400 shrink-0" />
+          <p className="text-xs text-amber-400 font-medium">
+            {isAr
+              ? `${clubs.filter((c) => c.status === 'suspended').length} فريق/فرق موقوفة مؤقتاً — لن تظهر للطلاب في دليل الأندية.`
+              : `${clubs.filter((c) => c.status === 'suspended').length} team(s) are suspended — hidden from student club directory.`}
+          </p>
+        </div>
+      )}
 
-            <div className="pt-2 border-t border-border/60 flex items-center justify-between text-xs">
-              <span className="text-muted-foreground">{c.openRoles.length} {isAr ? 'أدوار مفتوحة' : 'open roles'}</span>
-              <span className="font-semibold text-gold flex items-center gap-1">
-                <CheckCircle2 className="size-3.5" /> {isAr ? 'متاح للتقديم' : 'Recruiting'}
-              </span>
-            </div>
-          </Panel>
-        ))}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {clubs.map((c) => {
+          const isSuspended = c.status === 'suspended'
+          const isProcessing = suspendingId === c.id
+          return (
+            <Panel key={c.id} className={`relative flex flex-col justify-between space-y-3 transition-all ${isSuspended ? 'opacity-60 border-amber-500/30 bg-amber-500/5' : ''}`}>
+              <div>
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="inline-block rounded-full bg-gold/15 px-2.5 py-0.5 text-xs font-semibold text-gold">
+                      {c.category}
+                    </span>
+                    {isSuspended && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/20 border border-amber-500/40 px-2 py-0.5 text-[10px] font-bold text-amber-400">
+                        <PauseCircle className="size-3" />
+                        {isAr ? 'موقوف' : 'Suspended'}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    {/* Suspend / Resume Button */}
+                    <button
+                      onClick={() => handleSuspend(c.id)}
+                      disabled={isProcessing}
+                      className={`rounded-lg p-1.5 transition-colors disabled:opacity-50 ${
+                        isSuspended
+                          ? 'text-emerald-400 hover:bg-emerald-500/15 border border-emerald-500/30'
+                          : 'text-amber-400 hover:bg-amber-500/15 border border-amber-500/20'
+                      }`}
+                      title={isSuspended ? (isAr ? 'إعادة تفعيل التيم' : 'Resume Team') : (isAr ? 'إيقاف التيم مؤقتاً' : 'Suspend Team')}
+                    >
+                      {isProcessing ? (
+                        <div className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                      ) : isSuspended ? (
+                        <PlayCircle className="size-4" />
+                      ) : (
+                        <PauseCircle className="size-4" />
+                      )}
+                    </button>
+                    {/* Delete Button */}
+                    <button
+                      onClick={() => deleteClub(c.id)}
+                      className="rounded-lg p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors border border-border/40"
+                      title={isAr ? 'حذف التيم' : 'Delete Team'}
+                    >
+                      <Trash2 className="size-4" />
+                    </button>
+                  </div>
+                </div>
+                <h4 className="mt-2 font-display text-lg font-bold">{c.name}</h4>
+                <p className="text-xs text-muted-foreground">{c.faculty} · {c.members} {isAr ? 'عضو' : 'members'}</p>
+                <p className="mt-2 text-xs text-foreground/80 line-clamp-2">{c.description}</p>
+              </div>
+
+              <div className="pt-2 border-t border-border/60 flex items-center justify-between text-xs">
+                <span className="text-muted-foreground">{c.openRoles.length} {isAr ? 'أدوار مفتوحة' : 'open roles'}</span>
+                {isSuspended ? (
+                  <span className="font-semibold text-amber-400 flex items-center gap-1">
+                    <PauseCircle className="size-3.5" /> {isAr ? 'موقوف مؤقتاً' : 'Suspended'}
+                  </span>
+                ) : (
+                  <span className="font-semibold text-gold flex items-center gap-1">
+                    <CheckCircle2 className="size-3.5" /> {isAr ? 'متاح للتقديم' : 'Recruiting'}
+                  </span>
+                )}
+              </div>
+            </Panel>
+          )
+        })}
       </div>
 
       {/* Modal Add Club */}

@@ -19,6 +19,7 @@ export type Club = {
   achievements: string[]
   events: { title: string; date: string; location: string }[]
   openRoles: string[]
+  status?: 'active' | 'suspended'
 }
 
 export const categories: Category[] = [

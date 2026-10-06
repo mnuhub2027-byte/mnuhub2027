@@ -35,8 +35,9 @@ export function ClubDirectory({
   const sectionRef = useRef<HTMLElement>(null)
   const inView = useInView(sectionRef, { once: true, margin: '-80px' })
 
-  // Dual-axis filtering: Category + Faculty
+  // Dual-axis filtering: Category + Faculty (exclude suspended teams)
   const displayClubs = clubs.filter((c) => {
+    if (c.status === 'suspended') return false
     const matchesCategory = category === 'All' || c.category === category
     const matchesFaculty =
       selectedFaculty === 'All' ||

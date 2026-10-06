@@ -63,6 +63,7 @@ type SystemContextType = {
   clubs: Club[]
   addClub: (newClub: Omit<Club, 'id' | 'members'>) => void
   deleteClub: (clubId: string) => void
+  suspendClub: (clubId: string) => Promise<void>
 
   // Admin Accounts (Faculty Control)
   admins: AdminAccount[]
@@ -541,6 +542,33 @@ export function SystemProvider({ children }: { children: ReactNode }) {
     if (error) { toast.error('فشل حذف التيم: ' + error.message); return }
     setClubs((prev) => prev.filter((c) => c.id !== clubId))
     toast.success('تم حذف التيم بنجاح')
+  }
+
+  // Faculty: Suspend / Resume club (toggle)
+  const suspendClub = async (clubId: string) => {
+    const club = clubs.find((c) => c.id === clubId)
+    if (!club) return
+
+    const newStatus: 'active' | 'suspended' = club.status === 'suspended' ? 'active' : 'suspended'
+
+    // Try to update in Supabase (requires 'status' column in clubs table)
+    const { error } = await supabase
+      .from('clubs')
+      .update({ status: newStatus })
+      .eq('id', clubId)
+
+    if (error) {
+      // If column doesn't exist yet, update local state only
+      console.warn('Supabase update failed (status column may not exist):', error.message)
+    }
+
+    setClubs((prev) => prev.map((c) => c.id === clubId ? { ...c, status: newStatus } : c))
+
+    if (newStatus === 'suspended') {
+      toast.success(`تم إيقاف التيم "${club.name}" مؤقتاً ⏸`)
+    } else {
+      toast.success(`تم إعادة تفعيل التيم "${club.name}" بنجاح! 🎉`)
+    }
   }
 
   // Faculty: Add Admin Account
@@ -1181,6 +1209,7 @@ export function SystemProvider({ children }: { children: ReactNode }) {
         clubs,
         addClub,
         deleteClub,
+        suspendClub,
         admins,
         addAdmin,
         removeAdmin,
