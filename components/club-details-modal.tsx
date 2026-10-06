@@ -455,7 +455,7 @@ function ApplicationForm({
                 <input
                   type="email"
                   value={form.email}
-                  onChange={(e) => set('email')(e.target.value)}
+                  onChange={(e) => set('email')(e.target.value.trim())}
                   placeholder={t('modal.emailPlaceholder')}
                   className={inputClass}
                 />

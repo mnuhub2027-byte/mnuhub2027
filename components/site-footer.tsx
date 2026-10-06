@@ -69,7 +69,7 @@ export function SiteFooter() {
                       type="email"
                       required
                       value={newsletterEmail}
-                      onChange={(e) => setNewsletterEmail(e.target.value)}
+                      onChange={(e) => setNewsletterEmail(e.target.value.trim())}
                       placeholder={isAr ? 'أدخل البريد الجامعي الرسمي' : 'Enter official university email'}
                       className="w-full rounded-2xl border border-border bg-background/80 rtl:pr-10 ltr:pl-10 px-3 py-2.5 text-xs sm:text-sm outline-none focus:border-primary transition-all font-sans"
                     />

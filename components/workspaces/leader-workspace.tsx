@@ -178,7 +178,7 @@ function Approvals() {
             type="email"
             required
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(e) => setEmail(e.target.value.trim())}
             placeholder={isAr ? 'مثال: student@uni.edu' : 'e.g. student@uni.edu'}
             className="flex-1 rounded-xl border border-input bg-background/80 px-4 py-2.5 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary font-sans"
           />
